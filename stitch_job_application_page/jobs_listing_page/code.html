@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Jobs Listing Page</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#4F46E5", // Indigo-600
+                        "primary-hover": "#4338CA", // Indigo-700
+                        "background-light": "#F9FAFB", // Gray-50
+                        "card-white": "#FFFFFF",
+                        "text-main": "#111827", // Gray-900
+                        "text-secondary": "#6B7280", // Gray-500
+                        "border-color": "#E5E7EB", // Gray-200
+                        "accent-purple": "#5646F5",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"],
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                    }
+                },
+            },
+        };
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }.custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #D1D5DB;
+            border-radius: 20px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #9CA3AF;
+        }
+    </style>
+</head>
+<body class="bg-background-light font-sans text-text-main h-screen flex flex-col overflow-hidden">
+<header class="bg-card-white border-b border-border-color shrink-0 z-30 relative">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16">
+<div class="flex">
+<div class="flex-shrink-0 flex items-center gap-3 cursor-pointer">
+<div class="h-9 w-9 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-base shadow-sm">JP</div>
+<div class="flex flex-col justify-center">
+<span class="font-bold text-lg leading-none text-gray-900 tracking-tight">JobPlatform</span>
+<span class="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Candidate</span>
+</div>
+</div>
+<nav class="hidden md:ml-10 md:flex md:space-x-1 items-center">
+<a class="inline-flex items-center px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary rounded-md transition-colors" href="#">Dashboard</a>
+<a class="inline-flex items-center px-3 py-2 text-sm font-medium text-primary bg-indigo-50 rounded-md transition-colors" href="#">Jobs</a>
+<a class="inline-flex items-center px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary rounded-md transition-colors" href="#">Applications</a>
+<a class="inline-flex items-center px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary rounded-md transition-colors" href="#">Profile</a>
+</nav>
+</div>
+<div class="flex items-center gap-3 sm:gap-5">
+<button class="hidden sm:block text-text-secondary hover:text-primary p-1 rounded-full relative transition-colors">
+<span class="material-symbols-outlined text-[24px]">notifications</span>
+<span class="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full border border-white"></span>
+</button>
+<div class="hidden sm:flex items-center gap-3 border-l border-border-color pl-5 h-8">
+<div class="text-right hidden lg:block">
+<p class="text-sm font-semibold text-text-main leading-none">Amir Amin</p>
+<p class="text-xs text-text-secondary mt-1 leading-none">Senior Developer</p>
+</div>
+<div class="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-100 to-indigo-200 flex items-center justify-center text-primary font-bold text-sm border border-indigo-100 ring-2 ring-transparent hover:ring-indigo-100 transition-all cursor-pointer">
+                        AA
+                    </div>
+</div>
+<div class="flex items-center md:hidden">
+<button class="text-text-main hover:text-primary p-2 -mr-2" type="button">
+<span class="material-symbols-outlined text-[28px]">menu</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</header>
+<main class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 overflow-hidden">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+<div class="lg:col-span-5 flex flex-col h-full gap-4 min-h-0">
+<div class="bg-card-white p-4 rounded-xl border border-border-color shadow-soft flex flex-col sm:flex-row gap-3">
+<div class="relative flex-grow">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm text-text-main transition duration-150 ease-in-out" placeholder="Search title or keyword" type="text"/>
+</div>
+<div class="relative w-full sm:w-44">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 text-[20px]">location_on</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm text-text-main transition duration-150 ease-in-out" placeholder="Location" type="text"/>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar pb-2">
+<div class="bg-card-white rounded-xl p-5 border-2 border-primary shadow-soft cursor-pointer relative group transition-all">
+<div class="flex justify-between items-start mb-2">
+<div class="flex flex-col">
+<h3 class="text-lg font-bold text-text-main">Senior Backend Engineer</h3>
+<p class="text-sm font-medium text-primary">Advanced MVP</p>
+</div>
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">Hybrid</span>
+</div>
+<div class="flex items-center gap-4 text-xs text-text-secondary mb-3 mt-1">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">location_on</span> New York, NY</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> Full-time</span>
+</div>
+<p class="text-sm text-text-secondary line-clamp-2 mb-4 leading-relaxed">
+                        Scale APIs, improve reliability, and drive infra improvements. We are looking for an experienced engineer to join our core team.
+                    </p>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">AWS</span>
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">Node.js</span>
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">PostgreSQL</span>
+</div>
+</div>
+<div class="bg-card-white rounded-xl p-5 border border-border-color hover:border-gray-300 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
+<div class="flex justify-between items-start mb-2">
+<div class="flex flex-col">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">Lead Frontend Engineer</h3>
+<p class="text-sm font-medium text-text-secondary group-hover:text-text-main">Advanced MVP</p>
+</div>
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100">Remote</span>
+</div>
+<div class="flex items-center gap-4 text-xs text-text-secondary mb-3 mt-1">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">public</span> Remote - US</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> Full-time</span>
+</div>
+<p class="text-sm text-text-secondary line-clamp-2 mb-4 leading-relaxed">
+                        Own design systems and product surfaces across web. Collaborate with product managers and designers.
+                    </p>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">React</span>
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">TypeScript</span>
+</div>
+</div>
+<div class="bg-card-white rounded-xl p-5 border border-border-color hover:border-gray-300 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
+<div class="flex justify-between items-start mb-2">
+<div class="flex flex-col">
+<h3 class="text-lg font-bold text-text-main group-hover:text-primary transition-colors">Product Designer</h3>
+<p class="text-sm font-medium text-text-secondary group-hover:text-text-main">Advanced MVP</p>
+</div>
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-100">On-site</span>
+</div>
+<div class="flex items-center gap-4 text-xs text-text-secondary mb-3 mt-1">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">location_on</span> San Francisco, CA</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">schedule</span> Contract</span>
+</div>
+<p class="text-sm text-text-secondary line-clamp-2 mb-4 leading-relaxed">
+                        We need a visionary designer to help shape our next generation of products. Expertise in Figma required.
+                    </p>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">Figma</span>
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100">UI/UX</span>
+</div>
+</div>
+</div>
+</div>
+<div class="hidden lg:flex lg:col-span-7 flex-col bg-card-white rounded-xl border border-border-color shadow-soft h-full overflow-hidden">
+<div class="p-8 border-b border-gray-100 relative bg-white z-10">
+<div class="flex justify-between items-start mb-5">
+<div class="flex items-center gap-4">
+<div class="h-14 w-14 bg-primary rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md">JP</div>
+<div>
+<h1 class="text-2xl font-bold text-text-main tracking-tight">Senior Backend Engineer</h1>
+<p class="text-sm font-medium text-text-secondary mt-0.5">Advanced MVP • Posted 2 days ago</p>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="text-text-secondary hover:text-text-main p-2.5 rounded-lg hover:bg-gray-50 border border-gray-200 transition-all" title="Save Job">
+<span class="material-symbols-outlined text-[20px] leading-none">bookmark_border</span>
+</button>
+<button class="bg-primary hover:bg-primary-hover text-white px-6 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+                            Apply Now
+                            <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="flex flex-wrap items-center gap-3 text-sm text-text-secondary pt-2">
+<span class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-text-main font-medium">
+<span class="material-symbols-outlined text-[18px] text-gray-400">location_on</span> New York, NY (Hybrid)
+                    </span>
+<span class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-text-main font-medium">
+<span class="material-symbols-outlined text-[18px] text-gray-400">schedule</span> Full-time
+                    </span>
+<span class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-text-main font-medium">
+<span class="material-symbols-outlined text-[18px] text-gray-400">payments</span> $140k - $180k
+                    </span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+<section class="mb-10">
+<h3 class="text-xs font-bold text-text-secondary uppercase tracking-widest mb-4">About the role</h3>
+<div class="space-y-4 text-text-main leading-relaxed text-[15px]">
+<p>
+                            Scale APIs, improve reliability, and drive infra improvements. You will work closely with the CTO and the rest of the engineering team to build a scalable and robust backend infrastructure.
+                        </p>
+<p>
+                            We are looking for someone who cares deeply about code quality, performance, and reliability. You should be comfortable working in a fast-paced environment and taking ownership of your work.
+                        </p>
+</div>
+</section>
+<section class="mb-10">
+<h3 class="text-xs font-bold text-text-secondary uppercase tracking-widest mb-4">Responsibilities</h3>
+<ul class="space-y-3 text-[15px] text-text-main">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<span>Design and implement scalable APIs and backend services using Node.js.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<span>Optimize PostgreSQL database performance and ensure data integrity.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<span>Collaborate with frontend engineers to integrate user-facing elements.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<span>Implement security and data protection measures.</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">check_circle</span>
+<span>Mentor junior engineers and conduct code reviews.</span>
+</li>
+</ul>
+</section>
+<section class="mb-8">
+<h3 class="text-xs font-bold text-text-secondary uppercase tracking-widest mb-4">Tech Stack</h3>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-50 text-text-main border border-gray-200">AWS</span>
+<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-50 text-text-main border border-gray-200">Node.js</span>
+<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-50 text-text-main border border-gray-200">PostgreSQL</span>
+<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-50 text-text-main border border-gray-200">Redis</span>
+<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-50 text-text-main border border-gray-200">Docker</span>
+</div>
+</section>
+<div class="border-t border-gray-100 pt-6 mt-6">
+<h3 class="text-xs font-bold text-text-secondary uppercase tracking-widest mb-4">Hiring Manager</h3>
+<div class="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
+<div class="flex items-center gap-4">
+<div class="h-12 w-12 rounded-full bg-gradient-to-br from-primary to-accent-purple flex items-center justify-center text-white font-bold text-sm shadow-md">
+                                JS
+                            </div>
+<div>
+<p class="text-sm font-bold text-text-main">John Smith</p>
+<p class="text-xs text-text-secondary font-medium">CTO at Advanced MVP</p>
+</div>
+</div>
+<button class="text-sm text-primary font-semibold hover:text-primary-hover px-4 py-2 hover:bg-indigo-50 rounded-lg transition-colors">View Profile</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

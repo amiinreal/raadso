@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login / Sign Up Page - Job Platform</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#4F46E5", // Indigo 600
+                        primaryHover: "#4338ca", // Indigo 700
+                        "background-light": "#FFFFFF", 
+                        "background-dark": "#0B1120", 
+                        "card-light": "#FFFFFF",
+                        "card-dark": "#1E293B", 
+                        "text-light-primary": "#111827",
+                        "text-light-secondary": "#6B7280",
+                        "text-dark-primary": "#F9FAFB",
+                        "text-dark-secondary": "#9CA3AF",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-white dark:bg-background-dark font-display min-h-screen flex flex-col antialiased transition-colors duration-200">
+<header class="w-full bg-white dark:bg-card-dark border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between items-center h-16">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md">
+                    JP
+                </div>
+<div class="hidden sm:flex flex-col">
+<span class="font-bold text-text-light-primary dark:text-text-dark-primary text-lg leading-tight tracking-tight">JobPlatform</span>
+</div>
+</div>
+
+<div class="flex lg:hidden">
+<button class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white focus:outline-none p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800" type="button">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-12">
+<div class="w-full max-w-5xl bg-white dark:bg-card-dark rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden grid grid-cols-1 lg:grid-cols-2">
+<div class="p-8 sm:p-12 flex flex-col justify-center h-full relative z-10 bg-white dark:bg-card-dark">
+<div class="mb-8">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-semibold mb-4 border border-blue-100 dark:border-blue-800/50">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+                    Secure Login
+                </div>
+<h1 class="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary mb-2 tracking-tight">Welcome back</h1>
+<p class="text-text-light-secondary dark:text-text-dark-secondary text-sm">Enter your credentials to access your dashboard.</p>
+</div>
+<form action="#" class="space-y-5" method="POST">
+<div>
+<label class="block text-sm font-semibold text-text-light-primary dark:text-text-dark-primary mb-2" for="email">Email</label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+<span class="material-symbols-outlined text-[20px]">mail</span>
+</span>
+<input class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" id="email" name="email" placeholder="you@example.com" required="" type="email"/>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-2">
+<label class="block text-sm font-semibold text-text-light-primary dark:text-text-dark-primary" for="password">Password</label>
+<a class="text-xs text-primary font-medium hover:underline" href="#">Forgot password?</a>
+</div>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+<span class="material-symbols-outlined text-[20px]">lock</span>
+</span>
+<input class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+</div>
+</div>
+<div class="flex items-center">
+<input class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" id="remember-me" name="remember-me" type="checkbox"/>
+<label class="ml-2 block text-sm text-text-light-secondary dark:text-text-dark-secondary" for="remember-me">Remember me</label>
+</div>
+<button class="w-full bg-primary hover:bg-primaryHover text-white font-semibold py-3 rounded-lg shadow-sm transition-all transform active:scale-[0.99] flex justify-center items-center gap-2" type="submit">
+                    Sign In
+                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</form>
+<div class="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 text-center">
+<p class="text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                    Don't have an account? <a class="text-primary font-semibold hover:text-primaryHover transition-colors" href="#">Create free account</a>
+</p>
+</div>
+</div>
+<div class="bg-gray-50 dark:bg-gray-800/30 p-8 sm:p-12 flex flex-col justify-center border-t lg:border-t-0 lg:border-l border-gray-200 dark:border-gray-800 relative">
+<div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-purple-200 dark:bg-purple-900/20 rounded-full blur-3xl opacity-60"></div>
+<div class="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-blue-200 dark:bg-blue-900/20 rounded-full blur-3xl opacity-60"></div>
+<div class="relative z-10">
+<h3 class="text-2xl font-bold text-text-light-primary dark:text-text-dark-primary mb-6">Why sign up?</h3>
+<div class="space-y-8">
+<div class="flex gap-4 group">
+<div class="flex-shrink-0 w-12 h-12 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300">
+<span class="material-symbols-outlined">person_search</span>
+</div>
+<div>
+<h4 class="text-base font-bold text-text-light-primary dark:text-text-dark-primary">For Job Seekers</h4>
+<p class="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1 leading-relaxed">
+                                Create a comprehensive profile with seniority and CV. Apply to roles instantly with one click and track your applications.
+                            </p>
+</div>
+</div>
+<div class="flex gap-4 group">
+<div class="flex-shrink-0 w-12 h-12 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300">
+<span class="material-symbols-outlined">business_center</span>
+</div>
+<div>
+<h4 class="text-base font-bold text-text-light-primary dark:text-text-dark-primary">For Employers</h4>
+<p class="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1 leading-relaxed">
+                                Post roles with detailed requirements. Access a unified dashboard to review structured candidate data efficiently.
+                            </p>
+</div>
+</div>
+<div class="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700/60 shadow-sm mt-4">
+<div class="flex gap-2 mb-2">
+<span class="material-symbols-outlined text-yellow-400 text-sm">star</span>
+<span class="material-symbols-outlined text-yellow-400 text-sm">star</span>
+<span class="material-symbols-outlined text-yellow-400 text-sm">star</span>
+<span class="material-symbols-outlined text-yellow-400 text-sm">star</span>
+<span class="material-symbols-outlined text-yellow-400 text-sm">star</span>
+</div>
+<p class="text-sm italic text-text-light-secondary dark:text-text-dark-secondary leading-relaxed">
+                            "Enterprise-ready schema supports detailed hiring workflows and candidate matching algorithms tailored for tech teams."
+                        </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="mt-auto py-8 bg-white dark:bg-card-dark border-t border-gray-100 dark:border-gray-800">
+<div class="max-w-7xl mx-auto px-4 text-center">
+<p class="text-xs text-text-light-secondary dark:text-text-dark-secondary">© 2023 Advanced MVP Job Platform. All rights reserved.</p>
+</div>
+</footer>
+<script>
+    // Dark mode logic (preserved from original)
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+    }
+</script>
+
+</body></html>

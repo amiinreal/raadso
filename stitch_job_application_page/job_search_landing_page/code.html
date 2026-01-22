@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Job Search Landing Page</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    primary: "#5451e7",
+                    "text-main": "#0f172a",
+                    "text-body": "#475569",
+                    surface: "#f8fafc",
+                },
+                fontFamily: {
+                    display: ["Inter", "sans-serif"],
+                },
+                borderRadius: {
+                    DEFAULT: "0.5rem",
+                },
+            },
+        },
+    };
+</script>
+</head>
+<body class="bg-white font-display text-text-main antialiased">
+<nav class="bg-white border-b border-gray-100 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16">
+<div class="flex items-center gap-3">
+<div class="bg-primary text-white rounded-lg p-1.5 h-9 w-9 flex items-center justify-center font-bold text-base shadow-sm">
+                    JP
+                </div>
+<div class="hidden sm:flex flex-col">
+<span class="text-[10px] uppercase text-text-body tracking-wider font-bold">Job Platform</span>
+<span class="text-text-main font-bold text-sm leading-none">Advanced MVP</span>
+</div>
+</div>
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-sm font-medium text-text-body hover:text-primary transition-colors" href="#">Find Jobs</a>
+<a class="text-sm font-medium text-text-body hover:text-primary transition-colors" href="#">Companies</a>
+<a class="text-sm font-medium text-text-body hover:text-primary transition-colors" href="#">Salaries</a>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center gap-3">
+<a class="text-sm font-medium text-text-main hover:text-primary px-3 py-2" href="#">Sign In</a>
+<a class="bg-primary text-white text-sm font-medium px-5 py-2.5 rounded-full hover:opacity-90 transition-all shadow-sm" href="#">
+                        Get Started
+                    </a>
+</div>
+<div class="flex md:hidden">
+<button class="text-text-body hover:text-text-main p-2" type="button">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main>
+<section class="pt-16 pb-12 sm:pt-24 sm:pb-16 px-4 sm:px-6 lg:px-8 text-center max-w-5xl mx-auto">
+<h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-text-main tracking-tight mb-6">
+            Find Your Next <span class="text-primary">Opportunity</span>
+</h1>
+<p class="text-lg sm:text-xl text-text-body mb-10 max-w-2xl mx-auto leading-relaxed">
+            Discover curated roles from innovative companies. Connect with teams that value your skills and ambitions. Built for professionals.
+        </p>
+<div class="flex flex-col sm:flex-row justify-center gap-4 w-full sm:w-auto mb-16">
+<button class="bg-primary text-white font-medium px-8 py-3.5 rounded-lg hover:opacity-90 transition-opacity shadow-lg shadow-indigo-200/50">
+                Explore Open Roles
+            </button>
+<button class="bg-white text-text-main border border-gray-200 font-medium px-8 py-3.5 rounded-lg hover:bg-gray-50 transition-colors">
+                Post a Job
+            </button>
+</div>
+<div class="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/60 border border-gray-100 max-w-4xl mx-auto transform -translate-y-4">
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+<div class="md:col-span-5 relative group">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 group-focus-within:text-primary">search</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary transition duration-150 ease-in-out text-sm" placeholder="Job title or keyword" type="text"/>
+</div>
+<div class="md:col-span-5 relative group">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 group-focus-within:text-primary">location_on</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary transition duration-150 ease-in-out text-sm" placeholder="Location (e.g. Remote)" type="text"/>
+</div>
+<div class="md:col-span-2">
+<button class="w-full flex items-center justify-center py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-text-main hover:bg-gray-800 focus:outline-none active:bg-gray-900 transition duration-150 ease-in-out h-full shadow-lg">
+                        Search
+                    </button>
+</div>
+</div>
+<div class="mt-4 flex flex-wrap gap-2 justify-center md:justify-start text-xs text-gray-500">
+<span class="font-semibold">Popular:</span>
+<a class="hover:text-primary underline decoration-gray-300 underline-offset-2" href="#">Frontend Engineer</a>
+<span class="text-gray-300">•</span>
+<a class="hover:text-primary underline decoration-gray-300 underline-offset-2" href="#">Product Manager</a>
+<span class="text-gray-300">•</span>
+<a class="hover:text-primary underline decoration-gray-300 underline-offset-2" href="#">Remote</a>
+</div>
+</div>
+</section>
+<section class="py-16 sm:py-24 bg-surface">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="text-center max-w-3xl mx-auto mb-16">
+<h2 class="text-sm font-bold text-primary tracking-wide uppercase">Why use our platform?</h2>
+<p class="mt-2 text-3xl font-extrabold text-text-main tracking-tight sm:text-4xl">
+                    Better ways to find work
+                </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+<div class="h-12 w-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center mb-6 group-hover:bg-red-100 transition-colors">
+<span class="material-symbols-outlined">track_changes</span>
+</div>
+<h3 class="text-xl font-bold text-text-main mb-3">Targeted Search</h3>
+<p class="text-text-body leading-relaxed text-sm">
+                        Find roles that match your skills, experience, and career goals with advanced filtering.
+                    </p>
+</div>
+<div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+<div class="h-12 w-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-6 group-hover:bg-indigo-100 transition-colors">
+<span class="material-symbols-outlined">bar_chart</span>
+</div>
+<h3 class="text-xl font-bold text-text-main mb-3">Rich Profiles</h3>
+<p class="text-text-body leading-relaxed text-sm">
+                        Create a comprehensive profile showcasing your experience, skills, and portfolio links.
+                    </p>
+</div>
+<div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+<div class="h-12 w-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-6 group-hover:bg-amber-100 transition-colors">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<h3 class="text-xl font-bold text-text-main mb-3">Quick Apply</h3>
+<p class="text-text-body leading-relaxed text-sm">
+                        Apply instantly with your complete profile. Companies see all your details at a glance.
+                    </p>
+</div>
+</div>
+</div>
+</section>
+<section class="py-16 sm:py-20">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="bg-primary rounded-3xl p-10 sm:p-16 text-white shadow-2xl shadow-primary/30 relative overflow-hidden">
+<div class="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-white opacity-5 rounded-full"></div>
+<div class="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-white opacity-5 rounded-full"></div>
+<div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-12 text-center divide-y md:divide-y-0 md:divide-x divide-white/10">
+<div class="flex flex-col items-center">
+<span class="text-5xl font-extrabold mb-3 tracking-tight">500+</span>
+<span class="text-sm font-semibold text-indigo-100 uppercase tracking-widest">Active Roles</span>
+</div>
+<div class="flex flex-col items-center pt-8 md:pt-0">
+<span class="text-5xl font-extrabold mb-3 tracking-tight">1000+</span>
+<span class="text-sm font-semibold text-indigo-100 uppercase tracking-widest">Companies</span>
+</div>
+<div class="flex flex-col items-center pt-8 md:pt-0">
+<span class="text-5xl font-extrabold mb-3 tracking-tight">50K+</span>
+<span class="text-sm font-semibold text-indigo-100 uppercase tracking-widest">Active Users</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="pb-24 pt-8 text-center px-6">
+<h2 class="text-2xl font-bold text-text-main mb-4">Ready to find your next opportunity?</h2>
+<p class="text-text-body mb-8 max-w-lg mx-auto">Join thousands of professionals finding their dream jobs every day.</p>
+<button class="bg-text-main text-white font-semibold px-8 py-3 rounded-full hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl">
+            Create Free Account
+        </button>
+</section>
+</main>
+
+</body></html>

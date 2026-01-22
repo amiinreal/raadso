@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Candidate Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#4F46E5", // Indigo-600 mostly matches the purple/blue accent
+              secondary: "#818CF8", // Lighter shade for accents
+              "background-light": "#F3F4F6", // Gray-100
+              "background-dark": "#0F172A", // Slate-900 like in the screenshot
+              "card-light": "#FFFFFF",
+              "card-dark": "#1E293B", // Slate-800
+              "text-light": "#111827", // Gray-900
+              "text-dark": "#F8FAFC", // Slate-50
+              "text-muted-light": "#6B7280", // Gray-500
+              "text-muted-dark": "#94A3B8", // Slate-400
+              "badge-light": "#E0E7FF", // Indigo-100
+              "badge-dark": "#312E81", // Indigo-900
+            },
+            fontFamily: {
+              display: ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem", // Rounded-xl for consistent look
+            },
+          },
+        },
+      };
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark min-h-screen transition-colors duration-200">
+<nav class="p-6">
+<div class="max-w-7xl mx-auto bg-card-light dark:bg-slate-100 rounded-2xl px-6 py-3 flex items-center justify-between shadow-sm">
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold shadow-sm">
+                    JP
+                </div>
+<div class="flex flex-col">
+<span class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">Job Platform</span>
+<span class="text-base font-bold text-gray-900">Advanced MVP</span>
+</div>
+</div>
+<div class="flex items-center space-x-1">
+<a class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium shadow-md" href="#">Dashboard</a>
+<a class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors" href="#">Jobs</a>
+<a class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors" href="#">Profile</a>
+<a class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors" href="#">Apply</a>
+<a class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors" href="#">Applications</a>
+</div>
+<div class="flex items-center space-x-3 text-sm">
+<span class="px-2 py-0.5 border border-gray-300 rounded text-[10px] font-bold text-gray-500 uppercase tracking-wide bg-white">Candidate</span>
+<span class="font-medium text-gray-700">ama.amiiin@gmail.com</span>
+<a class="text-primary hover:text-indigo-700 text-xs font-semibold" href="#">Logout</a>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-6 pb-12">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+<h3 class="text-xs font-bold text-text-muted-light dark:text-text-muted-dark uppercase tracking-widest mb-1">Open Roles</h3>
+<div class="text-4xl font-bold text-text-light dark:text-text-dark mb-1">2</div>
+<p class="text-sm text-text-muted-light dark:text-text-muted-dark">From your hiring board</p>
+</div>
+<div class="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+<h3 class="text-xs font-bold text-text-muted-light dark:text-text-muted-dark uppercase tracking-widest mb-1">Applications</h3>
+<div class="text-4xl font-bold text-text-light dark:text-text-dark mb-1">0</div>
+<p class="text-sm text-text-muted-light dark:text-text-muted-dark">Submitted with profile / CV</p>
+</div>
+<div class="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+<h3 class="text-xs font-bold text-text-muted-light dark:text-text-muted-dark uppercase tracking-widest mb-1">Profile Strength</h3>
+<div class="text-4xl font-bold text-text-light dark:text-text-dark mb-1">60%</div>
+<p class="text-sm text-text-muted-light dark:text-text-muted-dark">Higher visibility when complete</p>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 space-y-6">
+<div class="flex items-center justify-between mb-2">
+<div class="bg-badge-light dark:bg-gray-700 dark:text-white px-4 py-1.5 rounded-full text-primary dark:text-indigo-300 text-sm font-semibold shadow-sm inline-block">
+                        Highlighted roles
+                    </div>
+<span class="text-sm text-text-muted-light dark:text-text-muted-dark hidden sm:block">Click a card to open details</span>
+</div>
+<div class="mb-4">
+<h2 class="text-2xl font-bold text-text-light dark:text-text-dark tracking-tight">Move fast on these</h2>
+</div>
+<div class="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer relative group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-primary font-semibold text-sm">Full-time</span>
+<span class="bg-badge-light dark:bg-indigo-900/50 text-primary dark:text-indigo-300 px-3 py-1 rounded-full text-xs font-medium">Hybrid</span>
+</div>
+<h3 class="text-xl font-bold text-text-light dark:text-text-dark mb-1 group-hover:text-primary transition-colors">Senior Backend Engineer</h3>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm mb-4">New York, NY</p>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm mb-5 leading-relaxed">Scale APIs, improve reliability, and drive infra improvements.</p>
+<div class="flex flex-wrap gap-2">
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-xs font-medium">AWS</span>
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-xs font-medium">Node.js</span>
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-xs font-medium">PostgreSQL</span>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow cursor-pointer group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-primary font-semibold text-sm">Full-time</span>
+<span class="bg-badge-light dark:bg-indigo-900/50 text-primary dark:text-indigo-300 px-3 py-1 rounded-full text-xs font-medium">Remote</span>
+</div>
+<h3 class="text-xl font-bold text-text-light dark:text-text-dark mb-1 group-hover:text-primary transition-colors">Lead Frontend Engineer</h3>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm mb-4">Remote - US</p>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm mb-5 leading-relaxed">Own design systems and product surfaces across web.</p>
+<div class="flex flex-wrap gap-2">
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-xs font-medium">TypeScript</span>
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-xs font-medium">Design Systems</span>
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-xs font-medium">React</span>
+</div>
+</div>
+</div>
+<div class="space-y-6">
+<div class="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit">
+<div class="flex justify-between items-start mb-6">
+<span class="bg-badge-light dark:bg-indigo-900/50 text-primary dark:text-indigo-300 px-4 py-1.5 rounded-full text-sm font-semibold">Open to work</span>
+<div class="text-right">
+<span class="block text-[10px] font-bold text-text-muted-light dark:text-text-muted-dark uppercase tracking-widest mb-1">Employment</span>
+<span class="text-primary text-sm font-medium">Open to roles</span>
+</div>
+</div>
+<div class="space-y-1">
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm">ama.amiiin@gmail.com ·</p>
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm">+25261748004</p>
+</div>
+</div>
+<div class="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 min-h-[200px]">
+<div class="mb-4">
+<span class="bg-badge-light dark:bg-indigo-900/50 text-primary dark:text-indigo-300 px-4 py-1.5 rounded-full text-sm font-semibold inline-block">Recent applications</span>
+</div>
+<div class="flex flex-col justify-center items-start h-32">
+<p class="text-text-muted-light dark:text-text-muted-dark text-sm">No applications yet. Apply with your profile or CV.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple script to demonstrate dark mode based on system preference or manual toggle (not implemented here but structure supports it)
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+
+</body></html>
