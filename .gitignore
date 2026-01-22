@@ -34,3 +34,12 @@ backend/node_modules/
 # Ignore frontend and backend .env files
 frontend/.env
 backend/.env
+
+# Project documentation and SQL seed files to ignore
+APPLICATION_REQUIREMENTS_FEATURE.md
+BUNNY_CDN_SETUP.md
+CODE_CHANGES.md
+FEATURE_USAGE_GUIDE.md
+SECURITY.md
+seed-nationalitie _and_languages.sql
+VALIDATION_IMPLEMENTATION.md
