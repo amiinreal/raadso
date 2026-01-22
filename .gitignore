@@ -1,3 +1,14 @@
+# Project documentation and SQL seed files to ignore
+APPLICATION_REQUIREMENTS_FEATURE.md
+BUNNY_CDN_SETUP.md
+CODE_CHANGES.md
+FEATURE_USAGE_GUIDE.md
+SECURITY.md
+seed-nationalitie _and_languages.sql
+VALIDATION_IMPLEMENTATION.md
+
+# Ignore design mockups and screenshots
+stitch_job_application_page/
 # Node modules
 node_modules/
 
