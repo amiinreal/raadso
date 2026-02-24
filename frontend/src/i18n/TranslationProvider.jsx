@@ -206,6 +206,11 @@ export const TranslationProvider = ({ children }) => {
 
   const t = useCallback((key, paramsOrFallback) => {
     if (!key) return ''
+    
+    // Enable "Translation Key Helper" if search param is present
+    const showKeys = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('showKeys');
+    if (showKeys) return `[${key}]`;
+
     let text = translations[key]
 
     // Handle fallback if key missing

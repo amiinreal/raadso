@@ -51,9 +51,9 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: '*',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Id']
 }))
 
@@ -154,7 +154,8 @@ async function startServer() {
   try {
     await ensureTranslationsReady()
   } catch (err) {
-    process.exit(1)
+    console.error('[i18n] Non-fatal error loading translations:', err.message)
+    // process.exit(1) // Don't exit in production if translations fail to load initially
   }
 
   app.listen(port, () => {

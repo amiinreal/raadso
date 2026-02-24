@@ -182,15 +182,19 @@ const calculateCompatibility = (job, candidateData, userPreferences, userInterac
   }
 
   // Calculate weighted score
-  score = (componentScores.skillMatch * 0.20) +
-    (componentScores.categoryMatch * 0.15) +
+  score = (componentScores.skillMatch * 0.35) +
+    (componentScores.categoryMatch * 0.10) +
     (componentScores.experienceMatch * 0.10) +
     (componentScores.behaviorMatch * 0.15) +
-    (componentScores.searchMatch * 0.15) +
+    (componentScores.searchMatch * 0.05) +
     (componentScores.profileMatch * 0.25)
 
+  // Boost score for profile completeness (baseline relevance)
+  if (candidateData.skills?.length > 3) score += 5;
+  if (candidateData.summary?.length > 100) score += 5;
+
   return {
-    score: Math.round(score),
+    score: Math.min(100, Math.round(score)),
     skillMatch: Math.round(componentScores.skillMatch),
     categoryMatch: Math.round(componentScores.categoryMatch),
     experienceMatch: Math.round(componentScores.experienceMatch),
