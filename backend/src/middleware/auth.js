@@ -15,18 +15,24 @@ export const authenticate = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, jwtSecret)
 
-    // If token carries a jti, optionally check session (but don't enforce strict expiry)
+    // If token carries a jti, check session and always enforce expiry/revoked for all sessions
     if (decoded.jti) {
       const sessionResult = await query(
-        `SELECT revoked_at FROM two_fa_sessions 
+        `SELECT revoked_at, expires_at FROM two_fa_sessions 
          WHERE token_jti = $1 
          LIMIT 1`,
         [decoded.jti]
       )
 
-      // Only reject if explicitly revoked
-      if (sessionResult.rows.length > 0 && sessionResult.rows[0].revoked_at) {
-        return res.status(401).json({ error: 'Session has been revoked' })
+      if (sessionResult.rows.length > 0) {
+        const { revoked_at, expires_at } = sessionResult.rows[0]
+        if (revoked_at) {
+          return res.status(401).json({ error: 'Session has been revoked' })
+        }
+        // Always enforce expiry for all sessions (trusted or not)
+        if (expires_at && new Date(expires_at) < new Date()) {
+          return res.status(401).json({ error: 'Session has expired' })
+        }
       }
     }
 

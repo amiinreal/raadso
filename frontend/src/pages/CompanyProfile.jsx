@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/api'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function CompanyProfile() {
   const { slug } = useParams()
@@ -75,7 +76,7 @@ export function CompanyProfile() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+        <LoadingSpinner />
       </div>
     )
   }

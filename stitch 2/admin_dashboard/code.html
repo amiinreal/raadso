@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RAADI Job Platform - Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1337ec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101322",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-link {
+            background-color: #1337ec;
+            color: white !important;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0">
+<div class="p-6 flex items-center gap-3">
+<div class="size-10 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined">work</span>
+</div>
+<div>
+<h1 class="text-slate-900 text-base font-bold leading-none">RAADI</h1>
+<p class="text-slate-500 text-xs font-medium">Admin Console</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg active-link text-sm font-medium" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">business_center</span>
+                Jobs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+                Candidates
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">verified_user</span>
+                Employers
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">payments</span>
+                Revenue
+            </a>
+<div class="pt-4 pb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Support</div>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+                Help Center
+            </a>
+</nav>
+<div class="p-4 border-t border-slate-100">
+<div class="flex items-center gap-3 p-2 bg-slate-50 rounded-xl">
+<div class="size-8 rounded-full bg-cover bg-center" data-alt="User profile avatar placeholder" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBQ5zQ9ooWliunKQiRpODK-xzp_MvNVIKOB7RsH9NleoKalbLgmAqfSD7ZLIXL68oqjxwQaO22tYgwpQ1hDpSHVUxXDtH9Vb5W8K0ZlmHiAPfPhZRTaPiCdSc4Fh3edTSSEgImJqt29Do8EvfhUVGwRtXbLfz8HbhtDVNFMy-IXJwPK6jDABZWvvUfwrIjUhhZjZimoFs8xxUePOMaZixFxVHU-3O7mDhwq2iAi2G23tQwi0TeLEAA77CbhgA7th_rrQErYgTU7juk");'></div>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-bold text-slate-900 truncate">Alex Rivera</p>
+<p class="text-[10px] text-slate-500 truncate">Super Admin</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-sm">unfold_more</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto flex flex-col">
+<!-- Header -->
+<header class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-10">
+<div class="flex items-center gap-4">
+<div class="flex items-center text-sm font-medium text-slate-500 gap-2">
+<span>Admin</span>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<span class="text-slate-900">Dashboard</span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary/20 placeholder:text-slate-400" placeholder="Search platform..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<button class="size-9 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="size-9 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+<span class="material-symbols-outlined">chat_bubble</span>
+</button>
+<div class="h-8 w-px bg-slate-200 mx-1"></div>
+<button class="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg flex items-center gap-2 hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-sm">add</span>
+                        Post New Job
+                    </button>
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<div class="p-8 space-y-8 max-w-[1400px] mx-auto w-full">
+<div class="flex items-end justify-between">
+<div>
+<h2 class="text-2xl font-bold text-slate-900">Dashboard Overview</h2>
+<p class="text-slate-500 text-sm mt-1">Welcome back, Alex. Here's what's happening on RAADI today.</p>
+</div>
+<div class="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+<button class="px-3 py-1.5 text-xs font-semibold text-slate-600 rounded-md hover:bg-slate-50">Day</button>
+<button class="px-3 py-1.5 text-xs font-semibold text-slate-600 rounded-md hover:bg-slate-50">Week</button>
+<button class="px-3 py-1.5 text-xs font-semibold text-white bg-primary rounded-md shadow-sm">Month</button>
+<button class="px-3 py-1.5 text-xs font-semibold text-slate-600 rounded-md hover:bg-slate-50">Year</button>
+</div>
+</div>
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Total Candidates -->
+<div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="size-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+<span class="material-symbols-outlined">person_search</span>
+</div>
+<span class="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-xs">trending_up</span>
+                            +12%
+                        </span>
+</div>
+<p class="text-slate-500 text-sm font-medium">Total Candidates</p>
+<h3 class="text-2xl font-bold text-slate-900 mt-1">12,450</h3>
+</div>
+<!-- Active Jobs -->
+<div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="size-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
+<span class="material-symbols-outlined">work_history</span>
+</div>
+<span class="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-xs">trending_up</span>
+                            +5%
+                        </span>
+</div>
+<p class="text-slate-500 text-sm font-medium">Active Jobs</p>
+<h3 class="text-2xl font-bold text-slate-900 mt-1">842</h3>
+</div>
+<!-- Verified Employers -->
+<div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="size-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+<span class="material-symbols-outlined">verified</span>
+</div>
+<span class="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-xs">trending_up</span>
+                            +8%
+                        </span>
+</div>
+<p class="text-slate-500 text-sm font-medium">Verified Employers</p>
+<h3 class="text-2xl font-bold text-slate-900 mt-1">1,205</h3>
+</div>
+<!-- Monthly Revenue -->
+<div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="size-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<span class="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full">
+<span class="material-symbols-outlined text-xs">trending_up</span>
+                            +15%
+                        </span>
+</div>
+<p class="text-slate-500 text-sm font-medium">Monthly Revenue</p>
+<h3 class="text-2xl font-bold text-slate-900 mt-1">$45,200</h3>
+</div>
+</div>
+<!-- Charts and Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- User Growth Chart Placeholder -->
+<div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h4 class="text-lg font-bold text-slate-900">User Growth</h4>
+<p class="text-sm text-slate-500">Platform acquisition statistics for 2023</p>
+</div>
+<select class="bg-slate-50 border-slate-200 rounded-lg text-xs font-semibold focus:ring-primary/20">
+<option>Monthly View</option>
+<option>Quarterly View</option>
+</select>
+</div>
+<div class="h-64 w-full relative">
+<!-- Abstract Chart Representation -->
+<div class="absolute bottom-0 left-0 w-full h-full flex items-end gap-2 px-2">
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 30%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 45%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 40%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 60%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 55%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 75%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 85%;"></div>
+<div class="bg-primary w-full rounded-t-lg shadow-lg" style="height: 95%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 65%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 80%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 70%;"></div>
+<div class="bg-primary/10 w-full rounded-t-lg transition-all hover:bg-primary/20" style="height: 90%;"></div>
+</div>
+</div>
+<div class="flex justify-between mt-4 px-2">
+<span class="text-[10px] font-bold text-slate-400 uppercase">Jan</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Feb</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Mar</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Apr</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">May</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Jun</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Jul</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Aug</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Sep</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Oct</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Nov</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Dec</span>
+</div>
+</div>
+<!-- Recent Activities -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+<div class="p-6 border-b border-slate-100 flex items-center justify-between">
+<h4 class="text-lg font-bold text-slate-900">Recent Activity</h4>
+<button class="text-xs font-bold text-primary hover:underline">View All</button>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<!-- Activity Item -->
+<div class="flex gap-4">
+<div class="size-10 rounded-full bg-slate-100 flex shrink-0 items-center justify-center text-slate-500 overflow-hidden border border-slate-200">
+<img class="size-full object-cover" data-alt="Activity user avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjFPLxcJBBLxF5uu76XmKZ1WGmrCInsCjG0g0pE3XC6SgrNJMUnqJGLUjlBKB6QSookbUfziJhgVhmpLgJjVt-Brz27HO8MpGADZMBl1B-urXk3YwVgllIPz27ZwLVfrR6WnfTZq-QcYL3lqVvNctobTF0omr59xNhYusq-A5TJUmzV9kl0r4M1QZ7L3lTIPT1OyYMhJHoNqYKVSdbzAXu-cKtgdQzeOOwseDMbX9CG1jFOtZGcnhL4EAUJpDj_hHkHggLOIEa-qU"/>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900">
+<span class="font-bold">Google Inc.</span> posted a new job: <span class="text-primary cursor-pointer hover:underline">Senior Cloud Architect</span>
+</p>
+<p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">schedule</span>
+                                    2 minutes ago
+                                </p>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="flex gap-4">
+<div class="size-10 rounded-full bg-emerald-50 flex shrink-0 items-center justify-center text-emerald-600 border border-emerald-100">
+<span class="material-symbols-outlined">verified_user</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900">
+                                    Employer <span class="font-bold">Fintech Solutions</span> has been successfully verified.
+                                </p>
+<p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">schedule</span>
+                                    45 minutes ago
+                                </p>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="flex gap-4">
+<div class="size-10 rounded-full bg-slate-100 flex shrink-0 items-center justify-center text-slate-500 overflow-hidden border border-slate-200">
+<img class="size-full object-cover" data-alt="Candidate avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIZ1gHegQk913pu4sAcKd87TzrtkNTyjms66DgS_V_vl8ylwPt_poVZgvlh7DboeKC3BdVUHKR6v62jJjJ7HN6J2XvuHTE1ZdmKgyP4RfcHSvQGSBqPFOokgjRcmSvydEEqyQeSXyKs3RoGHt4iH8PoUvdDZsRcsYpHOsCPzJwKjCDKLILq8Ptcx9ReshW9lmBRztpCUgU4TuDZS2-C9vAQ9KYYOrDVkdvXs5I5I9Mdo-VHZSdzI0kKGQj3HW9toltWEQCilDJFgM"/>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900">
+<span class="font-bold">Sarah Jenkins</span> applied for <span class="text-primary cursor-pointer hover:underline">Creative Director</span> at Spotify.
+                                </p>
+<p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">schedule</span>
+                                    3 hours ago
+                                </p>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="flex gap-4">
+<div class="size-10 rounded-full bg-primary/10 flex shrink-0 items-center justify-center text-primary border border-primary/20">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900">
+                                    New subscription payment of <span class="font-bold">$299</span> received from Amazon AWS.
+                                </p>
+<p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">schedule</span>
+                                    5 hours ago
+                                </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Table Section (Candidates List) -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+<div class="p-6 border-b border-slate-100 flex items-center justify-between">
+<h4 class="text-lg font-bold text-slate-900">Latest Candidate Sign-ups</h4>
+<button class="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">See Detailed List</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-slate-50">
+<tr>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Candidate Name</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Desired Position</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date Joined</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Verification Status</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-blue-100"></div>
+<span class="text-sm font-semibold text-slate-900">David Miller</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600">Product Designer</td>
+<td class="px-6 py-4 text-sm text-slate-600">Oct 24, 2023</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-tight">Verified</span>
+</td>
+<td class="px-6 py-4">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-purple-100"></div>
+<span class="text-sm font-semibold text-slate-900">Emma Watson</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600">Marketing Lead</td>
+<td class="px-6 py-4 text-sm text-slate-600">Oct 23, 2023</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-bold uppercase tracking-tight">Pending</span>
+</td>
+<td class="px-6 py-4">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-amber-100"></div>
+<span class="text-sm font-semibold text-slate-900">Michael Chen</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600">Backend Engineer</td>
+<td class="px-6 py-4 text-sm text-slate-600">Oct 23, 2023</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-tight">Verified</span>
+</td>
+<td class="px-6 py-4">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

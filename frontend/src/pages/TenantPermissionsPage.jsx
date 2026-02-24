@@ -2,11 +2,10 @@ import React, { useEffect, useState } from 'react';
 import api from '../api/api';
 
 const PERMISSION_KEYS = [
-  { key: 'can_edit_company', label: 'Edit Company Info' },
-  { key: 'can_review_applications', label: 'Review Applications' },
+  { key: 'can_invite_members', label: 'Invite Team Members' },
   { key: 'can_post_job', label: 'Post Job Listings' },
-  { key: 'can_update_job', label: 'Update Job Listings' },
-  { key: 'can_send_message', label: 'Send Messages' },
+  { key: 'can_review_applications', label: 'Review Applications' },
+  { key: 'can_view_audit_logs', label: 'View Audit Logs' },
 ];
 
 export default function TenantPermissionsPage({ tenantId }) {

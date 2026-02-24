@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from '../i18n/TranslationProvider'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function CandidateApplications({ applications = [], candidateId, token }) {
+    const { t } = useTranslation()
     const [selectedApplication, setSelectedApplication] = useState(null)
 
     // Messaging State
@@ -76,28 +79,28 @@ export function CandidateApplications({ applications = [], candidateId, token })
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        My Applications
+                        {t('applications.candidate.myApplications')}
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-1">Your Job Applications</h2>
-                    <p className="text-gray-600 text-sm">Track and manage all applications you've submitted</p>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('applications.candidate.header')}</h2>
+                    <p className="text-gray-600 text-sm">{t('applications.candidate.subHeader')}</p>
                 </div>
 
                 {/* Stats Overview */}
                 <div className="grid md:grid-cols-4 gap-4 mb-6">
                     <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                        <p className="text-xs text-gray-500 font-semibold mb-1">TOTAL</p>
+                        <p className="text-xs text-gray-500 font-semibold mb-1">{t('applications.candidate.stats.total')}</p>
                         <p className="text-2xl font-bold text-gray-900">{applications.length}</p>
                     </div>
                     <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-                        <p className="text-xs text-blue-600 font-semibold mb-1">APPLIED</p>
+                        <p className="text-xs text-blue-600 font-semibold mb-1">{t('applications.candidate.stats.applied')}</p>
                         <p className="text-2xl font-bold text-blue-700">{applications.filter(a => a.status === 'applied').length}</p>
                     </div>
                     <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
-                        <p className="text-xs text-yellow-600 font-semibold mb-1">REVIEWING</p>
+                        <p className="text-xs text-yellow-600 font-semibold mb-1">{t('applications.candidate.stats.reviewing')}</p>
                         <p className="text-2xl font-bold text-yellow-700">{applications.filter(a => a.status === 'reviewing').length}</p>
                     </div>
                     <div className="bg-green-50 rounded-xl border border-green-200 p-4">
-                        <p className="text-xs text-green-600 font-semibold mb-1">ACCEPTED</p>
+                        <p className="text-xs text-green-600 font-semibold mb-1">{t('applications.candidate.stats.accepted')}</p>
                         <p className="text-2xl font-bold text-green-700">{applications.filter(a => a.status === 'accepted').length}</p>
                     </div>
                 </div>
@@ -108,8 +111,8 @@ export function CandidateApplications({ applications = [], candidateId, token })
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">No applications yet</h3>
-                        <p className="text-gray-600">Start applying to jobs to see them here</p>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('applications.candidate.empty.title')}</h3>
+                        <p className="text-gray-600">{t('applications.candidate.empty.desc')}</p>
                     </div>
                 ) : (
                     <div className="grid gap-4">
@@ -132,7 +135,7 @@ export function CandidateApplications({ applications = [], candidateId, token })
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                                             </svg>
-                                            Messages
+                                            {t('applications.candidate.messages.button')}
                                         </button>
                                     </div>
                                 </div>
@@ -165,13 +168,11 @@ export function CandidateApplications({ applications = [], candidateId, token })
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                             {loadingMessages ? (
-                                <div className="flex justify-center py-10">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                                </div>
+                                <LoadingSpinner fullScreen={false} size="md" />
                             ) : messages.length === 0 ? (
                                 <div className="text-center py-10 text-gray-500">
-                                    <p>No messages yet.</p>
-                                    <p className="text-sm">Start a conversation with {activeApp?.company_name || 'the employer'}.</p>
+                                    <p>{t('applications.candidate.messages.empty')}</p>
+                                    <p className="text-sm">{t('applications.candidate.messages.start')}</p>
                                 </div>
                             ) : (
                                 messages.map(msg => {
@@ -196,7 +197,7 @@ export function CandidateApplications({ applications = [], candidateId, token })
                                 <textarea
                                     value={messageInput}
                                     onChange={(e) => setMessageInput(e.target.value)}
-                                    placeholder="Type a message..."
+                                    placeholder={t('applications.candidate.messages.type')}
                                     className="flex-1 border border-gray-300 rounded-lg p-2 text-sm resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                     rows="2"
                                     onKeyDown={(e) => {

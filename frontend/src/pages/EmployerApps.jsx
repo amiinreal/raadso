@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api/api'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function EmployerApps({ jobs = [], token }) {
   const [selectedJob, setSelectedJob] = useState(null)
@@ -98,10 +99,7 @@ export function EmployerApps({ jobs = [], token }) {
             </div>
 
             {loading ? (
-              <div className="text-center py-8">
-                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                <p className="text-gray-600">Loading jobs...</p>
-              </div>
+              <LoadingSpinner fullScreen={false} size="md" message="Loading jobs..." />
             ) : jobs.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                 <p className="text-gray-600">No jobs posted yet. Create a job to start receiving applications.</p>

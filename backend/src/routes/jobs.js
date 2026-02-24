@@ -10,6 +10,7 @@ import {
   isValidInteger,
   isValidPositiveInteger,
   isValidDate,
+  isValidUUID,
   EMPLOYMENT_TYPES,
   WORKPLACE_TYPES,
   CURRENCIES
@@ -58,13 +59,47 @@ const getUserFromHeader = (req) => {
   }
 }
 
-const getEmployerTenant = async (userId) => {
+const getEmployerTenant = async (userId, requestedTenantId = null) => {
   if (!userId) return null
-  const res = await query('SELECT id, approved FROM tenants WHERE user_id = $1 LIMIT 1', [userId])
-  return res.rows[0] || null
+
+  const findAccessibleTenant = async (tenantId) => {
+    if (!tenantId) return null
+    const accessResult = await query(
+      `SELECT DISTINCT t.id, t.approved
+       FROM tenants t
+       LEFT JOIN tenant_members tm ON tm.tenant_id = t.id AND tm.user_id = $1 AND tm.status = 'active'
+       WHERE t.id = $2 AND (t.user_id = $1 OR tm.user_id IS NOT NULL)
+       LIMIT 1`,
+      [userId, tenantId]
+    )
+    return accessResult.rows[0] || null
+  }
+
+  if (requestedTenantId) {
+    const requested = await findAccessibleTenant(requestedTenantId)
+    if (requested) return requested
+    return null
+  }
+
+  const owned = await query('SELECT id, approved FROM tenants WHERE user_id = $1 LIMIT 1', [userId])
+  if (owned.rows.length) {
+    return owned.rows[0]
+  }
+
+  const membership = await query(
+    `SELECT t.id, t.approved
+     FROM tenant_members tm
+     JOIN tenants t ON t.id = tm.tenant_id
+     WHERE tm.user_id = $1 AND tm.status = 'active'
+     ORDER BY CASE WHEN tm.role = 'manager' THEN 0 ELSE 1 END, t.created_at ASC
+     LIMIT 1`,
+    [userId]
+  )
+
+  return membership.rows[0] || null
 }
 
-const baseSelect = `
+const baseSelect = (candidateId = null) => `
 SELECT
   j.id,
   j.ad_number,
@@ -95,12 +130,20 @@ SELECT
   j.require_languages,
   j.require_nationality,
   j.custom_file_requirements,
+  j.auto_reply_enabled,
+  j.auto_reply_subject,
+  j.auto_reply_message,
+  j.hiring_contact_name,
+  j.hiring_contact_email,
+  j.rejection_subject,
+  j.rejection_message,
   tn.company_name,
-  tn.logo_url,
+  tn.logo_url AS company_logo_url,
   tn.slug AS company_slug,
   COALESCE(app_counts.count, 0) AS application_count,
   COALESCE(json_agg(DISTINCT jsonb_build_object('id', c.id, 'name', c.name, 'slug', c.slug, 'parent_id', c.parent_id)) FILTER (WHERE c.id IS NOT NULL), '[]') AS categories,
-  COALESCE(json_agg(DISTINCT t.tag) FILTER (WHERE t.tag IS NOT NULL), '[]') AS tags
+  COALESCE(json_agg(DISTINCT t.tag) FILTER (WHERE t.tag IS NOT NULL), '[]') AS tags,
+  ${candidateId ? `EXISTS (SELECT 1 FROM applications a WHERE a.job_id = j.id AND a.candidate_id = '${candidateId}') AS has_applied` : 'false AS has_applied'}
 FROM jobs j
 LEFT JOIN tenants tn ON tn.id = j.tenant_id
 LEFT JOIN job_tags t ON t.job_id = j.id
@@ -115,45 +158,62 @@ LEFT JOIN (
 
 router.get('/', async (req, res) => {
   try {
-    const { search, location, tag } = req.query
+    const { search, location, tag, tenantId } = req.query
     const user = getUserFromHeader(req)
     const where = []
     const params = []
     let idx = 1
 
-    if (user?.role === 'employer') {
+    if (tenantId && !isValidUUID(tenantId)) {
+      return res.status(400).json({ error: 'Invalid tenantId' })
+    }
+
+    let scopedTenantId = null
+    if (tenantId) {
+      if (!user?.userId) {
+        return res.status(401).json({ error: 'Authentication required for tenant scoped jobs' })
+      }
+      const tenantAccess = await getEmployerTenant(user.userId, tenantId)
+      if (!tenantAccess?.id) {
+        return res.status(403).json({ error: 'Not authorized to view jobs for this tenant' })
+      }
+      scopedTenantId = tenantAccess.id
+    } else if (user?.userId && user?.role === 'employer') {
       const tenant = await getEmployerTenant(user.userId)
-      if (!tenant?.id) {
+      scopedTenantId = tenant?.id || null
+      if (!scopedTenantId) {
         return res.json([])
       }
+    }
+
+    if (scopedTenantId) {
       where.push(`j.tenant_id = $${idx}`)
-      params.push(tenant.id)
+      params.push(scopedTenantId)
       idx += 1
-      // Employers see all their jobs (draft and published)
     } else {
-      // Non-employers only see active jobs
+      // Non-scoped requests only show active jobs
       where.push(`j.active = true`)
     }
 
     if (search) {
       where.push(`(j.title ILIKE $${idx} OR j.about_role ILIKE $${idx} OR j.about_company ILIKE $${idx})`)
-      params.push(`%${search}%`)
+      params.push(`% ${search}% `)
       idx += 1
     }
     if (location) {
-      where.push(`j.location ILIKE $${idx}`)
-      params.push(`%${location}%`)
+      where.push(`j.location ILIKE $${idx} `)
+      params.push(`% ${location}% `)
       idx += 1
     }
     if (tag) {
-      where.push(`EXISTS (SELECT 1 FROM job_tags jt WHERE jt.job_id = j.id AND jt.tag ILIKE $${idx})`)
-      params.push(`%${tag}%`)
+      where.push(`EXISTS(SELECT 1 FROM job_tags jt WHERE jt.job_id = j.id AND jt.tag ILIKE $${idx})`)
+      params.push(`% ${tag}% `)
       idx += 1
     }
 
-    let sql = baseSelect
+    let sql = baseSelect(user?.role === 'candidate' ? user.userId : null)
     if (where.length) {
-      sql += ` WHERE ${where.join(' AND ')}`
+      sql += ` WHERE ${where.join(' AND ')} `
     }
     sql += ' GROUP BY j.id, tn.id, app_counts.count ORDER BY j.created_at DESC'
 
@@ -171,15 +231,30 @@ router.get('/:id', async (req, res) => {
     const user = getUserFromHeader(req)
     let params = [id]
     let whereClause = 'j.id = $1'
+    const { tenantId } = req.query
+
+    if (tenantId && !isValidUUID(tenantId)) {
+      return res.status(400).json({ error: 'Invalid tenantId' })
+    }
 
     // Check if id is 9-digit number (ad_number) or UUID
     if (/^\d{9}$/.test(id)) {
       whereClause = 'j.ad_number = $1'
     }
 
-    let sql = `${baseSelect} WHERE ${whereClause}`
+    let sql = `${baseSelect(user?.role === 'candidate' ? user.userId : null)} WHERE ${whereClause} `
 
-    if (user?.role === 'employer') {
+    if (tenantId) {
+      if (!user?.userId) {
+        return res.status(401).json({ error: 'Authentication required for tenant scoped job' })
+      }
+      const tenant = await getEmployerTenant(user.userId, tenantId)
+      if (!tenant?.id) {
+        return res.status(403).json({ error: 'Not authorized to view this job' })
+      }
+      sql += ' AND j.tenant_id = $2'
+      params.push(tenant.id)
+    } else if (user?.role === 'employer') {
       const tenant = await getEmployerTenant(user.userId)
       if (!tenant?.id) {
         return res.status(404).json({ error: 'Job not found' })
@@ -220,7 +295,19 @@ const jobValidation = validateRequest({
   tags: { type: 'array', maxLength: 20 },
   requireProfile: { validator: (v) => typeof v === 'boolean', message: 'requireProfile must be a boolean' },
   requireCv: { validator: (v) => typeof v === 'boolean', message: 'requireCv must be a boolean' },
-  customFileRequirements: { type: 'array', maxLength: 10 }
+  requireExperience: { validator: (v) => typeof v === 'boolean', message: 'requireExperience must be a boolean' },
+  requireEducation: { validator: (v) => typeof v === 'boolean', message: 'requireEducation must be a boolean' },
+  requireLanguages: { type: 'array', maxLength: 10 },
+  requireNationality: { type: 'string', min: 0, max: 100 },
+  customFileRequirements: { type: 'array', maxLength: 10 },
+  autoReplyEnabled: { validator: (v) => v === undefined || typeof v === 'boolean', message: 'autoReplyEnabled must be a boolean' },
+  autoReplySubject: { type: 'string', min: 0, max: 200 },
+  autoReplyMessage: { type: 'string', min: 0, max: 5000 },
+  hiringContactName: { type: 'string', min: 0, max: 200 },
+  hiringContactEmail: { type: 'string', min: 0, max: 200 },
+  rejectionSubject: { type: 'string', min: 0, max: 200 },
+  rejectionMessage: { type: 'string', min: 0, max: 5000 },
+  active: { validator: (v) => typeof v === 'boolean', message: 'active must be a boolean' },
 })
 
 router.post('/', authenticate, checkTenantPermission('can_post_job'), jobValidation, async (req, res) => {
@@ -247,13 +334,22 @@ router.post('/', authenticate, checkTenantPermission('can_post_job'), jobValidat
     tags = [],
     requireProfile = false,
     requireCv = false,
+    requireExperience = false,
+    requireEducation = false,
+    requireLanguages = [],
+    requireNationality = null,
     customFileRequirements = [],
-    active = true
+    autoReplyEnabled = false,
+    autoReplySubject = null,
+    autoReplyMessage = null,
+    hiringContactName = null,
+    hiringContactEmail = null,
+    rejectionSubject = null,
+    rejectionMessage = null,
+    active = true,
+    allowMessaging = true,
+    allowReplies = true
   } = req.body
-
-  if (req.user.role !== 'employer') {
-    return res.status(403).json({ error: 'Only employers can post jobs' })
-  }
 
   if (!title) {
     return res.status(400).json({ error: 'Title is required' })
@@ -263,10 +359,19 @@ router.post('/', authenticate, checkTenantPermission('can_post_job'), jobValidat
     return res.status(400).json({ error: 'tenantId is required' })
   }
 
-  const tenant = await query('SELECT id, approved, phone, company_email, org_number, status FROM tenants WHERE id = $1 AND user_id = $2 LIMIT 1', [tenantId, req.user.userId])
-  const tenantRow = tenant.rows[0]
+  // Check if user owns the tenant or is a member with permission
+  const tenantCheck = await query(
+    `SELECT t.id, t.approved, t.phone, t.company_email, t.org_number, t.status
+     FROM tenants t
+     LEFT JOIN tenant_members tm ON tm.tenant_id = t.id AND tm.user_id = $1 AND tm.status = 'active'
+     WHERE t.id = $2 AND (t.user_id = $1 OR tm.user_id IS NOT NULL)
+     LIMIT 1`,
+    [req.user.userId, tenantId]
+  )
+  
+  const tenantRow = tenantCheck.rows[0]
   if (!tenantRow) {
-    return res.status(403).json({ error: 'You can only post jobs for your own tenant' })
+    return res.status(403).json({ error: 'You do not have access to post jobs for this tenant' })
   }
   if (!tenantRow.approved || tenantRow.status !== 'approved') {
     return res.status(403).json({ error: 'Tenant not approved by admin yet. Please wait for approval before posting jobs.' })
@@ -294,10 +399,10 @@ router.post('/', authenticate, checkTenantPermission('can_post_job'), jobValidat
       return res.status(500).json({ error: 'Failed to generate unique ad number' })
     }
     const insertJob = await client.query(
-      `INSERT INTO jobs (tenant_id, title, location, employment_type, workplace_type, seniority_level, about_role, about_company, key_responsibilities, required_skills, preferred_skills, salary_min, salary_max, currency, application_deadline, hiring_contacts, category_id, tech_stack, require_profile, require_cv, require_experience, require_education, require_languages, require_nationality, custom_file_requirements, ad_number, active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
-       RETURNING *`,
-      [tenantId, title, location || '', employmentType || '', workplaceType || '', seniorityLevel || '', aboutRole || '', aboutCompany || '', keyResponsibilities, requiredSkills, preferredSkills, salaryMin || null, salaryMax || null, currency || 'USD', applicationDeadline || null, JSON.stringify(hiringContacts), categoryId || null, techStack, requireProfile, requireCv, requireExperience, requireEducation, JSON.stringify(requireLanguages), requireNationality || null, JSON.stringify(customFileRequirements), adNumber, active],
+      `INSERT INTO jobs(tenant_id, title, location, employment_type, workplace_type, seniority_level, about_role, about_company, key_responsibilities, required_skills, preferred_skills, salary_min, salary_max, currency, application_deadline, hiring_contacts, category_id, tech_stack, require_profile, require_cv, require_experience, require_education, require_languages, require_nationality, custom_file_requirements, auto_reply_enabled, auto_reply_subject, auto_reply_message, hiring_contact_name, hiring_contact_email, rejection_subject, rejection_message, ad_number, active, allow_messaging, allow_replies)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
+RETURNING * `,
+      [tenantId, title, location || '', employmentType || '', workplaceType || '', seniorityLevel || '', aboutRole || '', aboutCompany || '', keyResponsibilities, requiredSkills, preferredSkills, salaryMin || null, salaryMax || null, currency || 'USD', applicationDeadline || null, JSON.stringify(hiringContacts), categoryId || null, techStack, requireProfile, requireCv, requireExperience, requireEducation, JSON.stringify(requireLanguages), requireNationality || null, JSON.stringify(customFileRequirements), autoReplyEnabled, autoReplySubject, autoReplyMessage, hiringContactName, hiringContactEmail, rejectionSubject, rejectionMessage, adNumber, active, allowMessaging !== false, allowReplies !== false],
     )
 
     const jobId = insertJob.rows[0].id
@@ -317,10 +422,31 @@ router.post('/', authenticate, checkTenantPermission('can_post_job'), jobValidat
 
     if (Array.isArray(tags) && tags.length) {
       const tagValues = tags.map((tagValue, idx) => `($1, $${idx + 2})`).join(',')
-      await client.query(`INSERT INTO job_tags (job_id, tag) VALUES ${tagValues}`, [job.id, ...tags])
+      await client.query(`INSERT INTO job_tags(job_id, tag) VALUES ${tagValues} `, [job.id, ...tags])
     }
 
-    const { rows } = await client.query(`${baseSelect} WHERE j.id = $1 GROUP BY j.id, tn.id, app_counts.count`, [job.id])
+    const { rows } = await client.query(`${baseSelect(req.user?.role === 'candidate' ? req.user.userId : null)} WHERE j.id = $1 GROUP BY j.id, tn.id, app_counts.count`, [job.id])
+    
+    // Add audit log for job creation
+    await client.query(
+      `INSERT INTO audit_logs (admin_id, action, target_type, target_id, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        req.user.userId,
+        'job_created',
+        'job',
+        jobId,
+        JSON.stringify({
+          title,
+          tenantId,
+          location,
+          employmentType,
+          workplaceType,
+          createdBy: req.user.userId
+        })
+      ]
+    )
+    
     await client.query('COMMIT')
     res.status(201).json(rows[0])
   } catch (err) {
@@ -354,6 +480,7 @@ router.put('/:id', authenticate, checkTenantPermission('can_update_job'), jobVal
     categoryId,
     categoryIds = [],
     techStack = [],
+    tags = [],
     requireProfile,
     requireCv,
     requireExperience,
@@ -361,26 +488,35 @@ router.put('/:id', authenticate, checkTenantPermission('can_update_job'), jobVal
     requireLanguages = [],
     requireNationality,
     customFileRequirements = [],
-    active
+    autoReplyEnabled,
+    autoReplySubject,
+    autoReplyMessage,
+    hiringContactName,
+    hiringContactEmail,
+    rejectionSubject,
+    rejectionMessage,
+    active,
+    allowMessaging,
+    allowReplies
   } = req.body
-
-  if (req.user.role !== 'employer') {
-    return res.status(403).json({ error: 'Only employers can update jobs' })
-  }
 
   const client = await getClient()
   try {
     await client.query('BEGIN')
 
-    // Check ownership
+    // Check ownership: either user owns the tenant OR is a member with permission
+    // The checkTenantPermission middleware already verified can_update_job permission
     const ownerCheck = await client.query(
-      'SELECT j.id FROM jobs j JOIN tenants t ON j.tenant_id = t.id WHERE j.id = $1 AND t.user_id = $2',
+      `SELECT j.id FROM jobs j 
+       JOIN tenants t ON j.tenant_id = t.id
+       LEFT JOIN tenant_members tm ON tm.tenant_id = t.id AND tm.user_id = $2 AND tm.status = 'active'
+       WHERE j.id = $1 AND (t.user_id = $2 OR tm.user_id IS NOT NULL)`,
       [id, req.user.userId]
     )
 
     if (ownerCheck.rows.length === 0) {
       await client.query('ROLLBACK')
-      return res.status(403).json({ error: 'You can only update your own jobs' })
+      return res.status(403).json({ error: 'You can only update jobs from your tenant' })
     }
 
     // Convert empty strings to null for UUID fields
@@ -388,38 +524,59 @@ router.put('/:id', authenticate, checkTenantPermission('can_update_job'), jobVal
 
     // Update job
     await client.query(
-      `UPDATE jobs SET 
-        title = COALESCE($2, title),
-        location = COALESCE($3, location),
-        employment_type = COALESCE($4, employment_type),
-        workplace_type = COALESCE($5, workplace_type),
-        seniority_level = COALESCE($6, seniority_level),
-        about_role = COALESCE($7, about_role),
-        about_company = COALESCE($8, about_company),
-        key_responsibilities = COALESCE($9, key_responsibilities),
-        required_skills = COALESCE($10, required_skills),
-        preferred_skills = COALESCE($11, preferred_skills),
-        salary_min = COALESCE($12, salary_min),
-        salary_max = COALESCE($13, salary_max),
-        currency = COALESCE($14, currency),
-        application_deadline = COALESCE($15, application_deadline),
-        hiring_contacts = COALESCE($16, hiring_contacts),
-        category_id = COALESCE($17, category_id),
-        tech_stack = COALESCE($18, tech_stack),
-        require_profile = COALESCE($19, require_profile),
-        require_cv = COALESCE($20, require_cv),
-        require_experience = COALESCE($21, require_experience),
-        require_education = COALESCE($22, require_education),
-        require_languages = COALESCE($23, require_languages),
-        require_nationality = COALESCE($24, require_nationality),
-        custom_file_requirements = COALESCE($25, custom_file_requirements),
-        active = COALESCE($26, active)
-      WHERE id = $1`,
-      [id, title, location, employmentType, workplaceType, seniorityLevel, aboutRole, aboutCompany,
-        keyResponsibilities, requiredSkills, preferredSkills, salaryMin, salaryMax, currency,
-        applicationDeadline, JSON.stringify(hiringContacts), cleanCategoryId, techStack, requireProfile,
-        requireCv, requireExperience, requireEducation, JSON.stringify(requireLanguages), requireNationality || null, JSON.stringify(customFileRequirements), active]
-    )
+      `UPDATE jobs SET
+title = COALESCE($2, title),
+  location = COALESCE($3, location),
+  employment_type = COALESCE($4, employment_type),
+  workplace_type = COALESCE($5, workplace_type),
+  seniority_level = COALESCE($6, seniority_level),
+  about_role = COALESCE($7, about_role),
+  about_company = COALESCE($8, about_company),
+  key_responsibilities = COALESCE($9, key_responsibilities),
+  required_skills = COALESCE($10, required_skills),
+  preferred_skills = COALESCE($11, preferred_skills),
+  salary_min = COALESCE($12, salary_min),
+  salary_max = COALESCE($13, salary_max),
+  currency = COALESCE($14, currency),
+  application_deadline = COALESCE($15, application_deadline),
+  hiring_contacts = COALESCE($16, hiring_contacts),
+  category_id = COALESCE($17, category_id),
+  tech_stack = COALESCE($18, tech_stack),
+  require_profile = COALESCE($19, require_profile),
+  require_cv = COALESCE($20, require_cv),
+  require_experience = COALESCE($21, require_experience),
+  require_education = COALESCE($22, require_education),
+  require_languages = COALESCE($23, require_languages),
+  require_nationality = COALESCE($24, require_nationality),
+  custom_file_requirements = COALESCE($25, custom_file_requirements),
+  auto_reply_enabled = COALESCE($26, auto_reply_enabled),
+  auto_reply_subject = COALESCE($27, auto_reply_subject),
+  auto_reply_message = COALESCE($28, auto_reply_message),
+  hiring_contact_name = COALESCE($29, hiring_contact_name),
+  hiring_contact_email = COALESCE($30, hiring_contact_email),
+  rejection_subject = COALESCE($31, rejection_subject),
+  rejection_message = COALESCE($32, rejection_message),
+  active = COALESCE($33, active),
+  allow_messaging = COALESCE($34, allow_messaging),
+  allow_replies = COALESCE($35, allow_replies)
+      WHERE id = $1
+RETURNING *
+  `, [
+      id, title, location, employmentType, workplaceType, seniorityLevel, aboutRole, aboutCompany,
+      keyResponsibilities || null,
+      requiredSkills || null,
+      preferredSkills || null,
+      salaryMin, salaryMax, currency, applicationDeadline,
+      hiringContacts ? JSON.stringify(hiringContacts) : null,
+      cleanCategoryId,
+      techStack || null,
+      requireProfile, requireCv, requireExperience, requireEducation,
+      requireLanguages || null,
+      requireNationality || null,
+      customFileRequirements ? JSON.stringify(customFileRequirements) : null,
+      autoReplyEnabled, autoReplySubject, autoReplyMessage, hiringContactName, hiringContactEmail,
+      rejectionSubject, rejectionMessage, active, allowMessaging, allowReplies
+    ])
 
     // Update category assignments
     if (categoryIds && categoryIds.length > 0) {
@@ -432,7 +589,17 @@ router.put('/:id', authenticate, checkTenantPermission('can_update_job'), jobVal
       }
     }
 
-    const { rows } = await client.query(`${baseSelect} WHERE j.id = $1 GROUP BY j.id, tn.id, app_counts.count`, [id])
+    // Update tags
+    if (tags) {
+      await client.query('DELETE FROM job_tags WHERE job_id = $1', [id])
+      if (tags.length > 0) {
+        const tagValues = tags.map((tagValue, idx) => `($1, $${idx + 2})`).join(',')
+        await client.query(`INSERT INTO job_tags(job_id, tag) VALUES ${tagValues} `, [id, ...tags])
+      }
+    }
+
+    const user = getUserFromHeader(req)
+    const { rows } = await client.query(`${baseSelect(user?.role === 'candidate' ? user.userId : null)} WHERE j.id = $1 GROUP BY j.id, tn.id, app_counts.count`, [id])
     await client.query('COMMIT')
     res.json(rows[0])
   } catch (err) {
@@ -498,72 +665,72 @@ router.get('/:id/applications', authenticate, async (req, res) => {
 
     // Fetch all applications for this job with COMPLETE candidate profiles
     const { rows } = await query(`
-      SELECT
-        a.id,
-        a.job_id,
-        a.candidate_id,
-        a.cover_letter,
-        a.used_profile,
-        a.used_cv,
-        a.custom_files,
-        a.notes,
-        a.status,
-        a.ai_match_score,
-        a.ai_analysis,
-        a.ai_reviewed_at,
-        a.applied_at,
-        a.updated_at,
-        CONCAT(cp.first_name, ' ', cp.last_name) AS candidate_name,
-        u.email AS candidate_email,
-        cp.first_name,
-        cp.last_name,
-        cp.headline AS candidate_title,
+SELECT
+a.id,
+  a.job_id,
+  a.candidate_id,
+  a.cover_letter,
+  a.used_profile,
+  a.used_cv,
+  a.custom_files,
+  a.notes,
+  a.status,
+  a.ai_match_score,
+  a.ai_analysis,
+  a.ai_reviewed_at,
+  a.applied_at,
+  a.updated_at,
+  CONCAT(cp.first_name, ' ', cp.last_name) AS candidate_name,
+    u.email AS candidate_email,
+      cp.first_name,
+      cp.last_name,
+      cp.headline AS candidate_title,
         cp.summary AS bio,
-        cp.location AS candidate_location,
-        cp.phone,
-        cp.nationality,
-        cp.seniority_level,
-        cp.years_of_experience,
-        cp.employment_status,
-        cp.open_to_work,
-        cp.cv_file_url,
-        cp.portfolio_url,
-        cp.linkedin_url,
-        cp.github_url,
-        cp.email AS candidate_profile_email,
-        (SELECT json_agg(json_build_object(
-          'id', we.id,
-          'job_title', we.job_title,
-          'company_name', we.company_name,
-          'employment_type', we.employment_type,
-          'start_date', we.start_date,
-          'end_date', we.end_date,
-          'description', we.description
-        ) ORDER BY we.start_date DESC) FROM work_experiences we WHERE we.candidate_id = a.candidate_id) AS work_experiences,
-        (SELECT json_agg(json_build_object(
-          'id', ed.id,
-          'degree', ed.degree,
-          'field_of_study', ed.field_of_study,
-          'institution', ed.institution,
-          'start_year', ed.start_year,
-          'end_year', ed.end_year
-        ) ORDER BY ed.start_year DESC) FROM educations ed WHERE ed.candidate_id = a.candidate_id) AS educations,
-        (SELECT json_agg(json_build_object(
-          'id', sk.id,
-          'skill_name', sk.skill_name,
-          'skill_type', sk.skill_type,
-          'proficiency', sk.proficiency
-        )) FROM skills sk WHERE sk.candidate_id = a.candidate_id) AS skills,
-        (SELECT json_agg(json_build_object(
-          'id', lg.id,
-          'language', lg.language,
-          'proficiency', lg.proficiency
-        )) FROM languages lg WHERE lg.candidate_id = a.candidate_id) AS languages,
-        (SELECT json_agg(json_build_object(
-          'id', att.id,
-          'type', att.type,
-          'file_url', att.file_url
-        )) FROM attachments att WHERE att.candidate_id = a.candidate_id) AS attachments
+          cp.location AS candidate_location,
+            cp.phone,
+            cp.nationality,
+            cp.seniority_level,
+            cp.years_of_experience,
+            cp.employment_status,
+            cp.open_to_work,
+            cp.cv_file_url,
+            cp.portfolio_url,
+            cp.linkedin_url,
+            cp.github_url,
+            cp.email AS candidate_profile_email,
+              (SELECT json_agg(json_build_object(
+                'id', we.id,
+                'job_title', we.job_title,
+                'company_name', we.company_name,
+                'employment_type', we.employment_type,
+                'start_date', we.start_date,
+                'end_date', we.end_date,
+                'description', we.description
+              ) ORDER BY we.start_date DESC) FROM work_experiences we WHERE we.candidate_id = a.candidate_id) AS work_experiences,
+                (SELECT json_agg(json_build_object(
+                  'id', ed.id,
+                  'degree', ed.degree,
+                  'field_of_study', ed.field_of_study,
+                  'institution', ed.institution,
+                  'start_year', ed.start_year,
+                  'end_year', ed.end_year
+                ) ORDER BY ed.start_year DESC) FROM educations ed WHERE ed.candidate_id = a.candidate_id) AS educations,
+                  (SELECT json_agg(json_build_object(
+                    'id', sk.id,
+                    'skill_name', sk.skill_name,
+                    'skill_type', sk.skill_type,
+                    'proficiency', sk.proficiency
+                  )) FROM skills sk WHERE sk.candidate_id = a.candidate_id) AS skills,
+                    (SELECT json_agg(json_build_object(
+                      'id', lg.id,
+                      'language', lg.language,
+                      'proficiency', lg.proficiency
+                    )) FROM languages lg WHERE lg.candidate_id = a.candidate_id) AS languages,
+                      (SELECT json_agg(json_build_object(
+                        'id', att.id,
+                        'type', att.type,
+                        'file_url', att.file_url
+                      )) FROM attachments att WHERE att.candidate_id = a.candidate_id) AS attachments
       FROM applications a
       LEFT JOIN candidate_profiles cp ON cp.id = a.candidate_id
       LEFT JOIN users u ON u.id = cp.user_id
@@ -598,7 +765,7 @@ router.post('/:id/bulk-email', authenticate, checkJobOwnership, async (req, res)
       `SELECT a.id, cp.first_name, cp.last_name, cp.email
        FROM applications a
        JOIN candidate_profiles cp ON a.candidate_id = cp.id
-       WHERE a.job_id = $1 AND a.id = ANY($2::uuid[])`,
+       WHERE a.job_id = $1 AND a.id = ANY($2:: uuid[])`,
       [id, applicationIds]
     )
 
@@ -617,7 +784,7 @@ router.post('/:id/bulk-email', authenticate, checkJobOwnership, async (req, res)
       let personalizedMessage = message
         .replace(/{first_name}/g, candidate.first_name || 'Candidate')
         .replace(/{last_name}/g, candidate.last_name || '')
-        .replace(/{full_name}/g, `${candidate.first_name} ${candidate.last_name}`.trim())
+        .replace(/{full_name}/g, `${candidate.first_name} ${candidate.last_name} `.trim())
         .replace(/{email}/g, candidate.email)
 
       // Send email
@@ -625,15 +792,19 @@ router.post('/:id/bulk-email', authenticate, checkJobOwnership, async (req, res)
         candidate.email,
         candidate.first_name,
         subject,
-        personalizedMessage,
-        employerName
+        message, // Use original message, emailService handles replacement
+        employerName,
+        0, // unreadCount
+        {
+          job_title: null // Optional: fetch job title if needed for bulk email
+        }
       )
 
       // Insert into messages table (as new message thread with subject, no parent)
       if (sendResult.success) {
         try {
           await query(
-            `INSERT INTO messages (application_id, sender_id, content, subject, parent_message_id) VALUES ($1, $2, $3, $4, NULL)`,
+            `INSERT INTO messages(application_id, sender_id, content, subject, parent_message_id) VALUES($1, $2, $3, $4, NULL)`,
             [candidate.id, req.user.userId, personalizedMessage, subject]
           )
         } catch (dbErr) {
@@ -655,7 +826,7 @@ router.post('/:id/bulk-email', authenticate, checkJobOwnership, async (req, res)
 
     res.json({
       success: true,
-      message: `Sent ${successCount} emails, failed ${failCount}`,
+      message: `Sent ${successCount} emails, failed ${failCount} `,
       details: results
     })
 

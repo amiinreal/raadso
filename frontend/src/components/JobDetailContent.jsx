@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from '../i18n/TranslationProvider'
 
 export function JobDetailContent({
   job,
@@ -9,10 +10,11 @@ export function JobDetailContent({
   showViewFullButton = false,
   noApplyLink = false,
 }) {
+  const { t } = useTranslation()
   if (!job) {
     return (
       <div className="flex items-center justify-center h-full text-text-secondary">
-        <p>No job selected</p>
+        <p>{t('jobDetail.noJobSelected')}</p>
       </div>
     )
   }
@@ -48,11 +50,16 @@ export function JobDetailContent({
 
           {/* Posted Date */}
           <p className="text-xs text-text-secondary text-center">
-            Posted {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {t('jobDetail.posted')} {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </p>
 
           {/* Job Classification and Location as badges */}
           <div className="flex flex-wrap gap-1 justify-center">
+            {job.has_applied && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-100 border border-green-200 text-green-800 font-bold text-[10px] uppercase">
+                {t('jobs.appliedBadge')}
+              </span>
+            )}
             {job.employment_type && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-50 border border-gray-100 text-text-main font-medium text-xs">
                 {job.employment_type}
@@ -68,7 +75,7 @@ export function JobDetailContent({
           {/* Application Deadline */}
           {job.application_deadline && (
             <p className="text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded px-2 py-1 text-center font-medium">
-              Deadline: {new Date(job.application_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {t('jobDetail.deadline')}: {new Date(job.application_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </p>
           )}
         </div>
@@ -91,7 +98,7 @@ export function JobDetailContent({
               <div>
                 <h1 className="text-2xl font-bold text-text-main tracking-tight">{job.title}</h1>
                 <p className="text-sm font-medium text-text-secondary mt-0.5">
-                  {job.company_name || 'Company'} • Posted {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {job.company_name || t('jobDetail.companyFallback')} • {t('jobDetail.posted')} {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </p>
               </div>
             </div>
@@ -99,11 +106,10 @@ export function JobDetailContent({
               <button
                 onClick={() => onSave && onSave(job)}
                 disabled={!onSave}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all shadow-sm ${
-                  isSaved
-                    ? 'bg-indigo-50 text-primary border-indigo-100'
-                    : 'bg-white text-text-secondary hover:text-text-main border-gray-200 hover:bg-gray-50'
-                } ${!onSave ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all shadow-sm ${isSaved
+                  ? 'bg-indigo-50 text-primary border-indigo-100'
+                  : 'bg-white text-text-secondary hover:text-text-main border-gray-200 hover:bg-gray-50'
+                  } ${!onSave ? 'opacity-60 cursor-not-allowed' : ''}`}
                 title={isSaved ? 'Saved' : 'Save Job'}
               >
                 <svg
@@ -116,14 +122,24 @@ export function JobDetailContent({
                 >
                   <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                 </svg>
-                <span className="text-sm font-semibold">{isSaved ? 'Saved' : 'Save'}</span>
+                <span className="text-sm font-semibold">{isSaved ? t('jobDetail.saved') : t('jobDetail.save')}</span>
               </button>
-              {noApplyLink ? (
+              {job.has_applied ? (
+                <button
+                  disabled
+                  className="bg-green-50 text-green-700 px-6 py-2.5 rounded-lg font-bold border border-green-200 cursor-not-allowed flex items-center gap-2 shadow-sm"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  {t('jobs.appliedBadge')}
+                </button>
+              ) : noApplyLink ? (
                 <button
                   onClick={() => onApply && onApply(job)}
                   className="bg-primary hover:bg-primary-hover text-white px-6 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
                 >
-                  Apply Now
+                  {t('jobDetail.apply')}
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -134,7 +150,7 @@ export function JobDetailContent({
                   onClick={() => onApply && onApply(job)}
                   className="bg-primary hover:bg-primary-hover text-white px-6 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
                 >
-                  Apply Now
+                  {t('jobDetail.apply')}
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -143,6 +159,14 @@ export function JobDetailContent({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary pt-2">
+            {job.has_applied && (
+              <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-100 text-green-700 font-bold uppercase text-[10px] tracking-wider shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                {t('jobs.appliedBadge')}
+              </span>
+            )}
             <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100 text-text-main font-medium">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -169,7 +193,7 @@ export function JobDetailContent({
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Deadline: {new Date(job.application_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {t('jobDetail.deadline')}: {new Date(job.application_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
             )}
           </div>
@@ -184,10 +208,10 @@ export function JobDetailContent({
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5.581m0 0H9m0 0h5.581m0 0a2.121 2.121 0 01-3.759 1.874m6.882-3.854a2.121 2.121 0 00-3.757-1.875m-10.926 0a2.121 2.121 0 003.757 1.874M15 12a3 3 0 11-6 0 3 3 0 016 0zm6 0a1 1 0 11-2 0 1 1 0 012 0z" />
               </svg>
-              About the Company
+              {t('jobDetail.aboutCompany')}
             </h3>
             <div className="space-y-4 text-text-main leading-relaxed text-[15px]">
-              <p>{job.about_company || 'No company description available.'}</p>
+              <p>{job.about_company || t('jobDetail.noCompanyDescription')}</p>
             </div>
           </section>
 
@@ -196,10 +220,10 @@ export function JobDetailContent({
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
               </svg>
-              About the Role
+              {t('jobDetail.aboutRole')}
             </h3>
             <div className="space-y-4 text-text-main leading-relaxed text-[15px]">
-              <p>{job.about_role || 'No description available.'}</p>
+              <p>{job.about_role || t('jobDetail.noRoleDescription')}</p>
             </div>
           </section>
 
@@ -209,7 +233,7 @@ export function JobDetailContent({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
-                Key Responsibilities
+                {t('jobDetail.keyResponsibilities')}
               </h3>
               <ul className="space-y-3 text-[15px] text-text-main">
                 {job.key_responsibilities.map((resp, idx) => (
@@ -230,7 +254,7 @@ export function JobDetailContent({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Required Skills
+                {t('jobDetail.requiredSkills')}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {job.required_skills.map((skill, idx) => (
@@ -248,7 +272,7 @@ export function JobDetailContent({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h-2m0 0h-2m2 0v-2m0 2v2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Preferred Skills
+                {t('jobDetail.preferredSkills')}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {job.preferred_skills.map((skill, idx) => (
@@ -266,7 +290,7 @@ export function JobDetailContent({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                 </svg>
-                Tech Stack
+                {t('jobDetail.techStack')}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {job.tech_stack.map((tech, idx) => (
@@ -284,7 +308,7 @@ export function JobDetailContent({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                Tags
+                {t('jobDetail.tags')}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {job.tags.map((tag, idx) => (
@@ -302,7 +326,7 @@ export function JobDetailContent({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
-                Hiring Contacts
+                {t('jobDetail.hiringContacts')}
               </h3>
               <div className="space-y-4 mb-[40px]">
                 {job.hiring_contacts.map((contact, idx) => {
@@ -346,7 +370,7 @@ export function JobDetailContent({
               onClick={() => onViewFull && onViewFull()}
               className="w-full mt-4 text-primary hover:text-primary-hover font-semibold text-sm py-2 border border-primary rounded-lg hover:bg-primary hover:text-white transition-all"
             >
-              View Full Details
+              {t('jobDetail.viewFull')}
             </button>
           )}
         </div>
@@ -357,11 +381,10 @@ export function JobDetailContent({
           <button
             onClick={() => onSave && onSave(job)}
             disabled={!onSave}
-            className={`px-4 py-3 rounded-lg font-semibold border text-sm flex items-center justify-center gap-1.5 flex-none transition ${
-              isSaved
-                ? 'bg-indigo-50 text-primary border-indigo-100'
-                : 'bg-white text-text-main border-gray-200'
-            } ${!onSave ? 'opacity-60 cursor-not-allowed' : ''}`}
+            className={`px-4 py-3 rounded-lg font-semibold border text-sm flex items-center justify-center gap-1.5 flex-none transition ${isSaved
+              ? 'bg-indigo-50 text-primary border-indigo-100'
+              : 'bg-white text-text-main border-gray-200'
+              } ${!onSave ? 'opacity-60 cursor-not-allowed' : ''}`}
             title={isSaved ? 'Saved' : 'Save Job'}
           >
             <svg
@@ -374,16 +397,26 @@ export function JobDetailContent({
             >
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
             </svg>
-            {isSaved ? 'Saved' : 'Save'}
+            {isSaved ? t('jobDetail.saved') : t('jobDetail.save')}
           </button>
 
           {/* Apply button */}
-          {noApplyLink ? (
+          {job.has_applied ? (
+            <button
+              disabled
+              className="flex-1 bg-green-50 text-green-700 px-3 py-3 rounded-lg font-bold border border-green-200 cursor-not-allowed flex items-center justify-center gap-1.5 text-sm"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              {t('jobs.appliedBadge')}
+            </button>
+          ) : noApplyLink ? (
             <button
               onClick={() => onApply && onApply(job)}
               className="flex-1 bg-primary hover:bg-primary-hover text-white px-3 py-3 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 text-sm"
             >
-              Apply Now
+              {t('jobDetail.apply')}
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
@@ -394,7 +427,7 @@ export function JobDetailContent({
               onClick={() => onApply && onApply(job)}
               className="flex-1 bg-primary hover:bg-primary-hover text-white px-3 py-3 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 text-sm block text-center"
             >
-              Apply Now
+              {t('jobDetail.apply')}
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>

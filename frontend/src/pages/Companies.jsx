@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/api'
 import { rankIndustriesByQuery } from '../utils/industrySearch'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function Companies() {
   const navigate = useNavigate()
@@ -181,8 +182,7 @@ export function Companies() {
       {/* Companies Grid */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-          <p className="mt-4 text-text-secondary">Loading companies...</p>
+          <LoadingSpinner fullScreen={false} size="lg" message="Loading companies..." />
         </div>
       ) : companies.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-100">

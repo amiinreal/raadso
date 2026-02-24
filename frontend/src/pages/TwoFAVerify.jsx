@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getDeviceId } from '../utils/device'
 import { useSearchParams } from 'react-router-dom'
 
 export function TwoFAVerify({ onSuccess }) {
@@ -21,6 +22,7 @@ export function TwoFAVerify({ onSuccess }) {
 
   const handleCancel = () => {
     localStorage.removeItem('pending-2fa-user-id')
+    localStorage.removeItem('pending-remember-me')
     window.location.href = '/auth'
   }
 
@@ -30,12 +32,14 @@ export function TwoFAVerify({ onSuccess }) {
     setLoading(true)
 
     try {
+      const deviceId = await getDeviceId()
+      const pendingRemember = localStorage.getItem('pending-remember-me') === '1'
       const response = await fetch('http://localhost:4000/auth/2fa/login-verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId, code, trustDevice }),
+        body: JSON.stringify({ userId, code, trustDevice, deviceId, rememberMe: pendingRemember }),
       })
 
       if (!response.ok) {
@@ -45,21 +49,38 @@ export function TwoFAVerify({ onSuccess }) {
 
       const data = await response.json()
 
-      // Store token and redirect
+      // Store token and user info, then redirect
       localStorage.setItem('job-platform-token', data.token)
+      if (data.user) {
+        localStorage.setItem('job-platform-user', JSON.stringify(data.user))
+      }
+      const rememberFlag = typeof data.rememberMe !== 'undefined'
+        ? data.rememberMe
+        : pendingRemember
+      localStorage.setItem('job-platform-remember-me', rememberFlag ? '1' : '0')
       localStorage.removeItem('pending-2fa-user-id')
+      localStorage.removeItem('pending-remember-me')
       setSuccess('Login successful!')
 
       if (onSuccess) {
-        onSuccess()
-      }
-
-      setTimeout(() => {
-        const storedRedirect = localStorage.getItem('pending-2fa-redirect')
-        const redirectTo = data.redirectTo || storedRedirect || '/'
+        // Clear all pending 2FA state and force full reload to dashboard
+        localStorage.removeItem('pending-2fa-user-id')
         localStorage.removeItem('pending-2fa-redirect')
-        window.location.href = redirectTo
-      }, 500)
+        localStorage.removeItem('pending-remember-me')
+        onSuccess()
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 100)
+      } else {
+        setTimeout(() => {
+          const storedRedirect = localStorage.getItem('pending-2fa-redirect')
+          const redirectTo = data.redirectTo || storedRedirect || '/'
+          localStorage.removeItem('pending-2fa-user-id')
+          localStorage.removeItem('pending-2fa-redirect')
+          localStorage.removeItem('pending-remember-me')
+          window.location.href = redirectTo
+        }, 500)
+      }
     } catch (err) {
       setError(err.message)
     } finally {

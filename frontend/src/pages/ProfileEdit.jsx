@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from '../i18n/TranslationProvider'
 import { 
   isValidLength, 
   isValidEmail, 
@@ -10,6 +11,7 @@ import {
 import { api } from '../api/api.js'
 
 export function ProfileEdit({ profile, onSave, saving }) {
+  const { t } = useTranslation()
   const [validationErrors, setValidationErrors] = useState({})
   const [masterNationalities, setMasterNationalities] = useState([])
   const [loadingNationalities, setLoadingNationalities] = useState(true)
@@ -19,7 +21,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
     lastName: '',
     headline: '',
     phone: '',
-    address: '',
+    location: '',
     nationality: '',
     seniorityLevel: '',
     yearsOfExperience: '',
@@ -38,7 +40,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
         lastName: profile.last_name || '',
         headline: profile.headline || '',
         phone: profile.phone || '',
-        address: profile.address || '',
+        location: profile.location || '',
         nationality: profile.nationality || '',
         seniorityLevel: profile.seniority_level || '',
         yearsOfExperience: profile.years_of_experience || '',
@@ -135,7 +137,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
       lastName: sanitizeInput(form.lastName),
       headline: sanitizeInput(form.headline),
       phone: sanitizeInput(form.phone),
-      address: sanitizeInput(form.address),
+      location: sanitizeInput(form.location),
       nationality: sanitizeInput(form.nationality),
       seniorityLevel: sanitizeInput(form.seniorityLevel),
       yearsOfExperience: form.yearsOfExperience ? parseInt(form.yearsOfExperience, 10) : null,
@@ -150,12 +152,12 @@ export function ProfileEdit({ profile, onSave, saving }) {
 
   return (
     <form onSubmit={handleSubmit} className="grid-card">
-      <p className="pill inline-block mb-3">Profile</p>
-      <h3 className="text-xl font-semibold text-slate-900">Edit your profile</h3>
+      <p className="pill inline-block mb-3">{t('profileEdit.badge')}</p>
+      <h3 className="text-xl font-semibold text-slate-900">{t('profileEdit.title')}</h3>
       <div className="grid gap-4 mt-4">
         <div className="grid md:grid-cols-2 gap-3">
           <label className="text-sm text-slate-700">
-            <span className="font-semibold">First name *</span>
+            <span className="font-semibold">{t('profileEdit.firstName')}</span>
             <input
               className={`w-full border ${validationErrors.firstName ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
               value={form.firstName}
@@ -168,7 +170,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
             )}
           </label>
           <label className="text-sm text-slate-700">
-            <span className="font-semibold">Last name *</span>
+            <span className="font-semibold">{t('profileEdit.lastName')}</span>
             <input
               className={`w-full border ${validationErrors.lastName ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
               value={form.lastName}
@@ -183,7 +185,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
         </div>
         
         <label className="text-sm text-slate-700">
-          <span className="font-semibold">Headline</span>
+          <span className="font-semibold">{t('profileEdit.headline')}</span>
           <input
             className={`w-full border ${validationErrors.headline ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
             value={form.headline}
@@ -198,7 +200,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
 
         <div className="grid md:grid-cols-2 gap-3">
           <label className="text-sm text-slate-700">
-            <span className="font-semibold">Phone</span>
+            <span className="font-semibold">{t('profileEdit.phone')}</span>
             <input
               className={`w-full border ${validationErrors.phone ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
               value={form.phone}
@@ -211,11 +213,11 @@ export function ProfileEdit({ profile, onSave, saving }) {
             )}
           </label>
           <label className="text-sm text-slate-700">
-            <span className="font-semibold">Location</span>
+            <span className="font-semibold">{t('profileEdit.location')}</span>
             <input
               className="w-full border border-slate-200 rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              value={form.address}
-              onChange={(e) => handleChange('address', e.target.value)}
+              value={form.location}
+              onChange={(e) => handleChange('location', e.target.value)}
               placeholder="Remote / Austin, TX"
             />
           </label>
@@ -223,14 +225,14 @@ export function ProfileEdit({ profile, onSave, saving }) {
 
         <div className="grid md:grid-cols-2 gap-3">
           <label className="text-sm text-slate-700">
-            <span className="font-semibold">Nationality</span>
+            <span className="font-semibold">{t('profileEdit.nationality')}</span>
             <select
               className="w-full border border-slate-200 rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               value={form.nationality}
               onChange={(e) => handleChange('nationality', e.target.value)}
               disabled={loadingNationalities}
             >
-              <option value="">Select Nationality</option>
+              <option value="">{t('profileEdit.selectNationality')}</option>
               {masterNationalities.map((nat) => (
                 <option key={nat.id} value={nat.name}>
                   {nat.name}
@@ -239,7 +241,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
             </select>
           </label>
           <label className="text-sm text-slate-700">
-            <span className="font-semibold">Years of Experience</span>
+            <span className="font-semibold">{t('profileEdit.yearsOfExperience')}</span>
             <input
               type="number"
               className={`w-full border ${validationErrors.yearsOfExperience ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
@@ -256,29 +258,29 @@ export function ProfileEdit({ profile, onSave, saving }) {
         </div>
 
         <label className="text-sm text-slate-700">
-          <span className="font-semibold">Seniority Level</span>
+          <span className="font-semibold">{t('profileEdit.seniorityLevel')}</span>
           <select
             className="w-full border border-slate-200 rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.seniorityLevel}
             onChange={(e) => handleChange('seniorityLevel', e.target.value)}
           >
-            <option value="">Select level</option>
-            <option value="entry">Entry Level</option>
-            <option value="mid">Mid Level</option>
-            <option value="senior">Senior</option>
-            <option value="lead">Lead</option>
-            <option value="principal">Principal</option>
+            <option value="">{t('profileEdit.selectLevel')}</option>
+            <option value="entry">{t('profileEdit.levels.entry')}</option>
+            <option value="mid">{t('profileEdit.levels.mid')}</option>
+            <option value="senior">{t('profileEdit.levels.senior')}</option>
+            <option value="lead">{t('profileEdit.levels.lead')}</option>
+            <option value="principal">{t('profileEdit.levels.principal')}</option>
           </select>
         </label>
         
         <label className="text-sm text-slate-700">
-          <span className="font-semibold">Summary</span>
+          <span className="font-semibold">{t('profileEdit.summary')}</span>
           <textarea
             className={`w-full border ${validationErrors.summary ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
             rows={4}
             value={form.summary}
             onChange={(e) => handleChange('summary', e.target.value)}
-            placeholder="Brief overview of your background and expertise..."
+            placeholder={t('profileEdit.summary.placeholder')}
             maxLength={2000}
           />
           {validationErrors.summary && (
@@ -287,11 +289,11 @@ export function ProfileEdit({ profile, onSave, saving }) {
         </label>
 
         <div className="border-t border-slate-200 pt-4">
-          <h4 className="text-sm font-semibold text-slate-900 mb-3">Links & Attachments</h4>
+          <h4 className="text-sm font-semibold text-slate-900 mb-3">{t('profileEdit.links.title')}</h4>
           
           <div className="grid gap-3">
             <label className="text-sm text-slate-700">
-              <span className="font-semibold">CV File URL</span>
+              <span className="font-semibold">{t('profileEdit.links.cv')}</span>
               <input
                 type="url"
                 className={`w-full border ${validationErrors.cvFileUrl ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
@@ -305,7 +307,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
               )}
             </label>
             <label className="text-sm text-slate-700">
-              <span className="font-semibold">Portfolio URL</span>
+              <span className="font-semibold">{t('profileEdit.links.portfolio')}</span>
               <input
                 type="url"
                 className={`w-full border ${validationErrors.portfolioUrl ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
@@ -319,7 +321,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
               )}
             </label>
             <label className="text-sm text-slate-700">
-              <span className="font-semibold">LinkedIn URL</span>
+              <span className="font-semibold">{t('profileEdit.links.linkedin')}</span>
               <input
                 type="url"
                 className={`w-full border ${validationErrors.linkedinUrl ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
@@ -333,7 +335,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
               )}
             </label>
             <label className="text-sm text-slate-700">
-              <span className="font-semibold">GitHub URL</span>
+              <span className="font-semibold">{t('profileEdit.links.github')}</span>
               <input
                 type="url"
                 className={`w-full border ${validationErrors.githubUrl ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 mt-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
@@ -355,7 +357,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
             checked={form.openToWork}
             onChange={(e) => handleChange('openToWork', e.target.checked)}
           />
-          <span>Open to work</span>
+          <span>{t('profileEdit.openToWork')}</span>
         </label>
       </div>
       <button
@@ -363,7 +365,7 @@ export function ProfileEdit({ profile, onSave, saving }) {
         className="mt-4 px-4 py-3 w-full rounded-lg bg-primary text-white font-semibold shadow-soft hover:opacity-90 disabled:opacity-60"
         disabled={saving}
       >
-        {saving ? 'Saving...' : 'Save profile'}
+        {saving ? 'Saving...' : t('profileEdit.save')}
       </button>
     </form>
   )

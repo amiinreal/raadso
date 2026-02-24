@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/api'
+import { ServerDownBanner } from '../components/ServerDownBanner'
+import { useTranslation } from '../i18n/TranslationProvider'
 
 export function Landing({ onLogin, onSearch, jobs = [] }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [location, setLocation] = useState('')
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
@@ -98,43 +101,44 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <ServerDownBanner isVisible={jobs.length === 0} />
       {/* Hero Section */}
       <div className="max-w-6xl mx-auto px-4 py-24">
         <div className="text-center mb-16">
           <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-4">
-            Find Your Next Opportunity
+            {t('landing.hero.title')}
           </h1>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-8">
-            Discover curated roles from innovative companies. Connect with teams that value your skills and ambitions. Built for professionals who want more than just a job.
+            {t('landing.hero.description')}
           </p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={onLogin}
               className="bg-primary text-white px-6 py-3 rounded-lg font-semibold shadow-soft hover:opacity-90 transition"
             >
-              Sign In / Register
+              {t('landing.hero.cta.signin')}
             </button>
             <a
               href="#search"
               className="border border-primary text-primary px-6 py-3 rounded-lg font-semibold hover:bg-primary/5 transition"
             >
-              Explore Jobs
+              {t('landing.hero.cta.explore')}
             </a>
           </div>
         </div>
 
         {/* Search Section */}
         <div id="search" className="grid-card mb-16">
-          <h2 className="text-2xl font-semibold text-slate-900 mb-6">Search Jobs</h2>
+          <h2 className="text-2xl font-semibold text-slate-900 mb-6">{t('landing.search.title')}</h2>
           <form onSubmit={handleSearch} className="grid md:grid-cols-2 gap-4">
             <div className="relative">
               <label className="text-sm text-slate-700">
-                <span className="font-semibold block mb-2">Job Title or Keyword</span>
+                <span className="font-semibold block mb-2">{t('landing.search.jobTitle')}</span>
                 <input
                   ref={searchInputRef}
                   type="text"
                   className="w-full border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g., Frontend Engineer, Product Manager"
+                  placeholder={t('landing.search.jobPlaceholder')}
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value)
@@ -154,7 +158,7 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
                   {filteredJobs.length > 0 && (
                     <div>
                       <div className="sticky top-0 px-3 py-2 bg-slate-50 border-b border-slate-200">
-                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Jobs</p>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{t('landing.search.dropdown.jobs')}</p>
                       </div>
                       {filteredJobs.map((job) => (
                         <div
@@ -175,7 +179,7 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
                               <p className="text-sm font-semibold text-slate-900 truncate">{job.title}</p>
                               <p className="text-xs text-slate-600 truncate">{job.company_name}</p>
                               {job.ad_number && (
-                                <p className="text-xs text-slate-400">ID: {job.ad_number}</p>
+                                <p className="text-xs text-slate-400">{t('landing.search.dropdown.jobId')}: {job.ad_number}</p>
                               )}
                             </div>
                           </div>
@@ -188,7 +192,7 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
                   {filteredCompanies.length > 0 && (
                     <div>
                       <div className="sticky top-0 px-3 py-2 bg-slate-50 border-b border-slate-200">
-                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Companies</p>
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{t('landing.search.dropdown.companies')}</p>
                       </div>
                       {filteredCompanies.map((company) => (
                         <div
@@ -220,11 +224,11 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
               )}
             </div>
             <label className="text-sm text-slate-700">
-              <span className="font-semibold block mb-2">Location</span>
+              <span className="font-semibold block mb-2">{t('landing.search.location')}</span>
               <input
                 type="text"
                 className="w-full border border-slate-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="e.g., Remote, San Francisco"
+                placeholder={t('landing.search.locationPlaceholder')}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
               />
@@ -233,7 +237,7 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
               type="submit"
               className="md:col-span-2 bg-primary text-white rounded-lg py-3 font-semibold shadow-soft hover:opacity-90 transition"
             >
-              Search
+              {t('landing.search.button')}
             </button>
           </form>
         </div>
@@ -244,24 +248,24 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
               <span className="text-2xl">🎯</span>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Targeted Search</h3>
-            <p className="text-sm text-slate-600">Find roles that match your skills, experience, and career goals with advanced filtering.</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{t('landing.features.title1')}</h3>
+            <p className="text-sm text-slate-600">{t('landing.features.description1')}</p>
           </div>
 
           <div className="grid-card">
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
               <span className="text-2xl">📊</span>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Rich Profiles</h3>
-            <p className="text-sm text-slate-600">Create a comprehensive profile showcasing your experience, skills, education, and portfolio links.</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{t('landing.features.title2')}</h3>
+            <p className="text-sm text-slate-600">{t('landing.features.description2')}</p>
           </div>
 
           <div className="grid-card">
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
               <span className="text-2xl">⚡</span>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Quick Apply</h3>
-            <p className="text-sm text-slate-600">Apply instantly with your complete profile. Companies see all your details at a glance.</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">{t('landing.features.title3')}</h3>
+            <p className="text-sm text-slate-600">{t('landing.features.description3')}</p>
           </div>
         </div>
 
@@ -269,28 +273,28 @@ export function Landing({ onLogin, onSearch, jobs = [] }) {
         <div className="bg-primary text-white rounded-xl p-12 text-center">
           <div className="grid md:grid-cols-3 gap-8">
             <div>
-              <p className="text-4xl font-bold mb-2">500+</p>
-              <p className="text-primary-light">Active Roles</p>
+              <p className="text-4xl font-bold mb-2">{t('landing.stats.rolesCount')}</p>
+              <p className="text-primary-light">{t('landing.stats.activeRoles')}</p>
             </div>
             <div>
-              <p className="text-4xl font-bold mb-2">1000+</p>
-              <p className="text-primary-light">Companies</p>
+              <p className="text-4xl font-bold mb-2">{t('landing.stats.companiesCount')}</p>
+              <p className="text-primary-light">{t('landing.stats.companies')}</p>
             </div>
             <div>
-              <p className="text-4xl font-bold mb-2">50K+</p>
-              <p className="text-primary-light">Active Users</p>
+              <p className="text-4xl font-bold mb-2">{t('landing.stats.usersCount')}</p>
+              <p className="text-primary-light">{t('landing.stats.activeUsers')}</p>
             </div>
           </div>
         </div>
 
         {/* CTA Section */}
         <div className="mt-16 text-center">
-          <p className="text-slate-600 mb-4">Ready to find your next opportunity?</p>
+          <p className="text-slate-600 mb-4">{t('landing.cta.ready')}</p>
           <button
             onClick={onLogin}
             className="bg-primary text-white px-8 py-3 rounded-lg font-semibold shadow-soft hover:opacity-90 transition"
           >
-            Get Started
+            {t('landing.cta.button')}
           </button>
         </div>
       </div>

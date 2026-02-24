@@ -4,10 +4,12 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "db:bootstrap": "bash ../scripts/db-bootstrap.sh",
+    "dev": "npm run db:bootstrap && nodemon src/server.js",
+    "start": "npm run db:bootstrap && node src/server.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -20,6 +22,9 @@
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "pg": "^8.13.1",
+    "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
     "resend": "^3.5.0"
   },
   "devDependencies": {

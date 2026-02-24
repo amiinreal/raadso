@@ -127,7 +127,7 @@ router.get('/:slug', async (req, res) => {
 })
 
 // PUT /companies/:slug - Update company profile (requires authentication and ownership)
-router.put('/:slug', authenticate, checkTenantPermission('can_edit_company'), async (req, res) => {
+router.put('/:slug', authenticate, checkTenantPermission('can_update_company_profile'), async (req, res) => {
   try {
     const { slug } = req.params
     const { 
@@ -135,16 +135,11 @@ router.put('/:slug', authenticate, checkTenantPermission('can_edit_company'), as
       website, logo_url, phone, company_email, company_size, founded_year,
       social_links, youtube_videos
     } = req.body
-    const userId = req.user.userId
 
     // Check ownership
     const tenantCheck = await query('SELECT id, user_id FROM tenants WHERE slug = $1', [slug])
     if (tenantCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' })
-    }
-
-    if (tenantCheck.rows[0].user_id !== userId) {
-      return res.status(403).json({ error: 'Not authorized to update this company' })
     }
 
     const companyId = tenantCheck.rows[0].id

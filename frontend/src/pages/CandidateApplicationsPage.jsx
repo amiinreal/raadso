@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function CandidateApplicationsPage() {
   const [data, setData] = useState({ applications: [], loading: true, error: null })
@@ -136,12 +137,7 @@ export function CandidateApplicationsPage() {
   if (data.loading) {
     return (
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 bg-background-light">
-        <div className="flex items-center justify-center py-16">
-          <div className="text-center">
-            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-gray-600">Loading applications...</p>
-          </div>
-        </div>
+        <LoadingSpinner message="Loading applications..." />
       </div>
     )
   }
@@ -253,7 +249,7 @@ export function CandidateApplicationsPage() {
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {loadingMessages ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <LoadingSpinner fullScreen={false} size="md" />
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
@@ -290,7 +286,19 @@ export function CandidateApplicationsPage() {
                             })}
                           </span>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {msg.content && typeof msg.content === 'string'
+                            ? msg.content
+                                .replace(/{first_name}/g, msg.first_name || '')
+                                .replace(/{last_name}/g, msg.last_name || '')
+                                .replace(/{full_name}/g, `${msg.first_name || ''} ${msg.last_name || ''}`.trim())
+                                .replace(/{job_title}/g, msg.job_title || '')
+                                .replace(/{company_name}/g, msg.company_name || '')
+                                .replace(/{hiring_contact_name}/g, msg.hiring_contact_name || '')
+                                .replace(/{hiring_contact_email}/g, msg.hiring_contact_email || '')
+                            : msg.content
+                          }
+                        </p>
                       </div>
                     </div>
                   ))
@@ -299,23 +307,30 @@ export function CandidateApplicationsPage() {
 
               {/* Input */}
               <div className="p-6 border-t border-gray-200">
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                    placeholder="Type your message..."
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={sendingMessage || !messageInput.trim()}
-                    className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {sendingMessage ? 'Sending...' : 'Send'}
-                  </button>
-                </div>
+                {selectedApp?.allow_replies === false ? (
+                  <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg">
+                    <p className="font-semibold">Replies Disabled</p>
+                    <p className="text-sm mt-1">The employer has disabled replies for this job. You can no longer send messages, but you can still receive messages from the employer.</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                      placeholder="Type your message..."
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sendingMessage || !messageInput.trim()}
+                      className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {sendingMessage ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

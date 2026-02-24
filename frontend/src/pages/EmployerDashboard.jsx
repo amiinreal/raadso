@@ -2,15 +2,19 @@ import { JobCard } from '../components/JobCard'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api } from '../api/api'
+import { useTranslation } from '../i18n/TranslationProvider'
 import { rankIndustriesByQuery } from '../utils/industrySearch'
 
-export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant, onSaveTenant, savingTenant, onEditJob, onTogglePublish, activeTab: initialActiveTab = null }) {
+export function EmployerDashboard({ jobs = [], token = null, onSelectJob, onCreateJob, tenant, onSaveTenant, savingTenant, onEditJob, onTogglePublish, activeTab: initialActiveTab = null, currentUser = null }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const activeJobs = jobs.filter((job) => job.active)
   const totalApplications = jobs.reduce((sum, job) => sum + (job.application_count || 0), 0)
   const missingContact = !tenant?.phone || !tenant?.company_email || !tenant?.org_number
   const notApproved = tenant?.status !== 'approved'
-  const createDisabled = notApproved || missingContact
+  // Only allow managers/owners to post jobs
+  const myUserId = currentUser?.id || localStorage.getItem('userId')
+  const isTenantOwner = tenant?.user_id === myUserId
 
   const [activeTab, setActiveTab] = useState(initialActiveTab || 'jobs')
   const [applications, setApplications] = useState([])
@@ -21,6 +25,7 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
   const [approvalDismissed, setApprovalDismissed] = useState(() => {
     return localStorage.getItem('tenantApprovalDismissed') === 'true'
   })
+  const storedToken = token || localStorage.getItem('job-platform-token')
 
   const [form, setForm] = useState({
     company_name: '',
@@ -40,16 +45,44 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
 
   // Permissions logic
   const [memberPermissions, setMemberPermissions] = useState({})
+  const [userTenantRole, setUserTenantRole] = useState(isTenantOwner ? 'owner' : (currentUser?.role || 'member'))
+  const effectiveRole = isTenantOwner ? 'owner' : (userTenantRole || 'member')
+  const effectivePermissions = memberPermissions || {}
+  // Only allow create if owner, manager, or has can_post_job
+  const createDisabled = notApproved || missingContact || !(effectiveRole === 'owner' || effectiveRole === 'manager' || effectivePermissions.can_post_job)
+
+  useEffect(() => {
+    const nextRole = isTenantOwner ? 'owner' : (userTenantRole || currentUser?.role || 'member')
+    setUserTenantRole((prev) => (prev === nextRole ? prev : nextRole))
+  }, [isTenantOwner, currentUser?.role])
+
   useEffect(() => {
     if (tenant?.id) {
-      api.getTenantMembers(tenant.id, localStorage.getItem('token'))
+      api.getTenantMembers(tenant.id, localStorage.getItem('job-platform-token'))
         .then(res => {
-          const me = res.find(m => m.user_id === (tenant.user_id || localStorage.getItem('userId')))
-          setMemberPermissions(me?.permissions || {})
+          const myId = currentUser?.id || localStorage.getItem('userId')
+          const me = res.find(m => m.user_id === myId)
+          if (me) {
+            let parsed = {}
+            if (me.permissions) {
+              try {
+                parsed = typeof me.permissions === 'string' ? JSON.parse(me.permissions) : me.permissions
+              } catch (err) {
+                console.warn('Failed to parse member permissions', err)
+              }
+            }
+            setMemberPermissions(parsed)
+            setUserTenantRole(me.role)
+          } else {
+            setMemberPermissions({})
+          }
         })
-        .catch(() => setMemberPermissions({}))
+        .catch(err => {
+          console.error('Failed to fetch permissions', err)
+          setMemberPermissions({})
+        })
     }
-  }, [tenant?.id])
+  }, [tenant?.id, currentUser?.id])
 
   useEffect(() => {
     if (tenant) {
@@ -97,23 +130,20 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
     if (activeTab === 'applications' && tenant?.id) {
       loadApplications()
     }
-  }, [activeTab, tenant?.id])
+  }, [activeTab, tenant?.id, storedToken])
 
   const loadApplications = async () => {
+    if (!tenant?.id || !storedToken) {
+      setApplications([])
+      return
+    }
     setLoadingApplications(true)
     try {
-      const response = await fetch(`${api.baseURL}/applications`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      })
-      const data = await response.json()
-      // Filter applications to only show those for jobs owned by this employer
-      const jobIds = jobs.map(j => j.id)
-      const employerApplications = data.filter(app => jobIds.includes(app.job_id))
-      setApplications(employerApplications)
+      const data = await api.getApplications({ tenantId: tenant.id }, storedToken)
+      setApplications(data || [])
     } catch (err) {
       console.error('Failed to load applications', err)
+      setApplications([])
     } finally {
       setLoadingApplications(false)
     }
@@ -134,6 +164,11 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
     setApprovalDismissed(true)
   }
 
+  const canEditTenantDetails = !tenant || isTenantOwner || userTenantRole === 'owner'
+  const tenantFieldsReadOnly = !canEditTenantDetails
+  const tenantUpdateDisabled = tenantFieldsReadOnly || savingTenant
+  const tenantUpdateLabel = tenant?.status === 'approved' ? 'Update Details' : 'Save & Request Approval'
+
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 bg-background-light">
       <div className="max-w-7xl mx-auto">
@@ -146,10 +181,10 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
-              <span className="text-xs font-medium text-gray-500">ACTIVE</span>
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{t('dashboard.employer.stats.active')}</span>
             </div>
             <p className="text-3xl font-bold text-gray-900 mb-1">{activeJobs.length}</p>
-            <p className="text-sm text-gray-600">Currently accepting applications</p>
+            <p className="text-sm text-gray-600">{t('dashboard.employer.stats.activeDesc')}</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -159,10 +194,10 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <span className="text-xs font-medium text-gray-500">APPLICATIONS</span>
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{t('dashboard.employer.stats.applications')}</span>
             </div>
             <p className="text-3xl font-bold text-gray-900 mb-1">{totalApplications}</p>
-            <p className="text-sm text-gray-600">Across all your listings</p>
+            <p className="text-sm text-gray-600">{t('dashboard.employer.stats.applicationsDesc')}</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -172,230 +207,326 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <span className="text-xs font-medium text-gray-500">DRAFTS</span>
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">{t('dashboard.employer.stats.drafts')}</span>
             </div>
             <p className="text-3xl font-bold text-gray-900 mb-1">{jobs.filter(j => !j.active).length}</p>
-            <p className="text-sm text-gray-600">Not yet published</p>
+            <p className="text-sm text-gray-600">{t('dashboard.employer.stats.draftsDesc')}</p>
           </div>
         </div>
 
         {/* Company Details Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
           <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold mb-3 border border-blue-100">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                Company Details
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-[10px] font-bold text-blue-700 uppercase tracking-widest">{t('dashboard.employer.tabs.company')}</h3>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('dashboard.employer.companyInfo')}</h2>
+                <p className="text-gray-600 text-sm">
+                  {tenant?.status === 'approved'
+                    ? t('dashboard.employer.companyInfoApproved')
+                    : t('dashboard.employer.companyInfoPending')}
+                </p>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">Tenant Information</h2>
-              <p className="text-gray-600 text-sm">
-                {tenant?.status === 'approved' 
-                  ? 'Your company is approved. You can update details anytime without losing approval.' 
-                  : 'Fill in company details to request approval and unlock job posting.'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              {tenant?.slug && (
-                <>
+              <div className="flex items-center gap-3">
+                {tenant?.slug && (
+                  <>
+                    <button
+                      onClick={() => navigate(`/companies/${tenant.slug}`)}
+                      className="px-4 py-2 border border-gray-300 text-text-main rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      {t('dashboard.employer.actions.viewProfile')}
+                    </button>
+                    {(isTenantOwner || userTenantRole === 'owner') && (
+                      <button
+                        onClick={() => navigate('/company/edit')}
+                        className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary-hover transition-colors flex items-center gap-2"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        {t('dashboard.employer.actions.editProfile')}
+                      </button>
+                    )}
+                  </>
+                )}
+                {/* Permissions management link for owner/admins */}
+                {tenant && (tenant.user_id === localStorage.getItem('userId') || memberPermissions.can_manage_permissions) && (
                   <button
-                    onClick={() => navigate(`/companies/${tenant.slug}`)}
-                    className="px-4 py-2 border border-gray-300 text-text-main rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center gap-2"
+                    onClick={() => navigate(`/tenant/${tenant.id}/permissions`)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center gap-2"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    View Profile
+                    {t('dashboard.employer.actions.managePermissions')}
                   </button>
-                  <button
-                    onClick={() => navigate('/company/edit')}
-                    className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary-hover transition-colors flex items-center gap-2"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit Profile
-                  </button>
-                </>
-              )}
-              {/* Permissions management link for owner/admins */}
-              {tenant && (tenant.user_id === localStorage.getItem('userId') || memberPermissions.can_manage_permissions) && (
-                <button
-                  onClick={() => navigate(`/tenant/${tenant.id}/permissions`)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center gap-2"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Manage Permissions
-                </button>
-              )}
-              {tenant && (
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-2 ${
-                    tenant.status === 'approved'
+                )}
+                {tenant && effectiveRole === 'owner' && (
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-2 ${tenant.status === 'approved'
                       ? 'bg-green-50 text-green-700 border border-green-200'
                       : tenant.status === 'rejected'
                         ? 'bg-red-50 text-red-700 border border-red-200'
                         : 'bg-amber-50 text-amber-700 border border-amber-200'
-                  }`}
-                >
-                  <span className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: tenant.status === 'approved' ? '#16a34a' : tenant.status === 'rejected' ? '#dc2626' : '#d97706' }}
-                  />
-                  {tenant.status}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {tenant?.status === 'rejected' && tenant?.rejection_reason && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 font-semibold mb-2 flex items-center gap-2">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                Application Rejected
-              </p>
-              <p className="text-red-700 text-sm">{tenant.rejection_reason}</p>
-              <p className="text-red-600 text-xs mt-2">Please update your information and resubmit for review.</p>
-            </div>
-          )}
-
-          {tenant?.status === 'pending' && (
-            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-amber-800 font-semibold mb-1 flex items-center gap-2">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                </svg>
-                Pending Admin Review
-              </p>
-              <p className="text-amber-700 text-sm">Your application is being reviewed by our admin team. You'll be notified once approved.</p>
-            </div>
-          )}
-
-          {tenant?.status === 'approved' && !approvalDismissed && (
-            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg relative">
-              <button
-                onClick={handleDismissApproval}
-                className="absolute top-3 right-3 text-green-600 hover:text-green-800 transition-colors"
-                aria-label="Dismiss"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <p className="text-green-800 font-semibold mb-1 flex items-center gap-2 pr-8">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Tenant Approved ✓
-              </p>
-              <p className="text-green-700 text-sm">Your company is verified and approved. You can now post jobs and update your details anytime.</p>
-            </div>
-          )}
-
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="grid md:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Company Name</label>
-                <input name="company_name" value={form.company_name} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" placeholder="Your Company Inc." required />
+                      }`}
+                  >
+                    <span className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: tenant.status === 'approved' ? '#16a34a' : tenant.status === 'rejected' ? '#dc2626' : '#d97706' }}
+                    />
+                    {tenant.status}
+                  </span>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Industry</label>
-                <div className="relative industry-dropdown-container">
-                  <input
-                    name="industry"
-                    value={industrySearch || form.industry}
-                    onChange={(e) => {
-                      setIndustrySearch(e.target.value)
-                      setShowIndustryDropdown(true)
-                    }}
-                    onFocus={() => setShowIndustryDropdown(true)}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
-                    placeholder="Search industries..."
-                  />
-                  {showIndustryDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm((prev) => ({ ...prev, industry_id: null, industry: '' }))
-                          setIndustrySearch('')
-                          setShowIndustryDropdown(false)
+            </div>
+
+            {tenant?.status === 'rejected' && tenant?.rejection_reason && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 font-semibold mb-2 flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  {t('dashboard.employer.rejectionTitle')}
+                </p>
+                <p className="text-red-700 text-sm">{tenant.rejection_reason}</p>
+                <p className="text-red-600 text-xs mt-2">{t('dashboard.employer.rejectionHint')}</p>
+              </div>
+            )}
+
+            {tenant?.status === 'pending' && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-amber-800 font-semibold mb-1 flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                  {t('dashboard.employer.pendingTitle')}
+                </p>
+                <p className="text-amber-700 text-sm">{t('dashboard.employer.pendingDesc')}</p>
+              </div>
+            )}
+
+            {tenant?.status === 'approved' && !approvalDismissed && (
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg relative">
+                <button
+                  onClick={handleDismissApproval}
+                  className="absolute top-3 right-3 text-green-600 hover:text-green-800 transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <p className="text-green-800 font-semibold mb-1 flex items-center gap-2 pr-8">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  {t('dashboard.employer.approvedTitle')}
+                </p>
+                <p className="text-green-700 text-sm">{t('dashboard.employer.approvedDesc')}</p>
+              </div>
+            )}
+
+            <form className="space-y-5" onSubmit={handleSubmit}>
+              <div className="grid md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.companyName')}</label>
+                  {tenantFieldsReadOnly ? (
+                    <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm">
+                      {form.company_name || t('common.notProvided')}
+                    </div>
+                  ) : (
+                    <input
+                      name="company_name"
+                      value={form.company_name}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="Your Company Inc."
+                      required
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.industry')}</label>
+                  {tenantFieldsReadOnly ? (
+                    <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm">
+                      {form.industry || t('common.notProvided')}
+                    </div>
+                  ) : (
+                    <div className="relative industry-dropdown-container">
+                      <input
+                        name="industry"
+                        value={industrySearch || form.industry}
+                        onChange={(e) => {
+                          setIndustrySearch(e.target.value)
+                          setShowIndustryDropdown(true)
                         }}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm border-b"
-                      >
-                        No Industry
-                      </button>
-                      {rankIndustriesByQuery(industries, industrySearch).map(({ category, items }) => (
-                        <div key={category}>
-                          <div className="px-4 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
-                            {category}
-                          </div>
-                          {items.map((ind) => (
-                            <button
-                              key={ind.id}
-                              type="button"
-                              onClick={() => {
-                                setForm((prev) => ({ ...prev, industry_id: ind.id, industry: ind.name }))
-                                setIndustrySearch(ind.name)
-                                setShowIndustryDropdown(false)
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm"
-                            >
-                              {ind.name}
-                            </button>
+                        onFocus={() => setShowIndustryDropdown(true)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                        placeholder={t('dashboard.employer.placeholders.industry')}
+                      />
+                      {showIndustryDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm((prev) => ({ ...prev, industry_id: null, industry: '' }))
+                              setIndustrySearch('')
+                              setShowIndustryDropdown(false)
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm border-b"
+                          >
+                            {t('dashboard.employer.noIndustry')}
+                          </button>
+                          {rankIndustriesByQuery(industries, industrySearch).map(({ category, items }) => (
+                            <div key={category}>
+                              <div className="px-4 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
+                                {category}
+                              </div>
+                              {items.map((ind) => (
+                                <button
+                                  key={ind.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setForm((prev) => ({ ...prev, industry_id: ind.id, industry: ind.name }))
+                                    setIndustrySearch(ind.name)
+                                    setShowIndustryDropdown(false)
+                                  }}
+                                  className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm"
+                                >
+                                  {ind.name}
+                                </button>
+                              ))}
+                            </div>
                           ))}
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
                 </div>
               </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Location</label>
-                <input name="location" value={form.location} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" placeholder="San Francisco, CA" />
+              <div className="grid md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.location')}</label>
+                  {tenantFieldsReadOnly ? (
+                    <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm">
+                      {form.location || t('common.notProvided')}
+                    </div>
+                  ) : (
+                    <input
+                      name="location"
+                      value={form.location}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="San Francisco, CA"
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.website')}</label>
+                  {tenantFieldsReadOnly ? (
+                    <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm">
+                      {form.website || t('common.notProvided')}
+                    </div>
+                  ) : (
+                    <input
+                      name="website"
+                      value={form.website}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="https://example.com"
+                    />
+                  )}
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Website</label>
-                <input name="website" value={form.website} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" placeholder="https://example.com" />
+                <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.description')}</label>
+                {tenantFieldsReadOnly ? (
+                  <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm leading-relaxed min-h-[120px]">
+                    {form.description || t('dashboard.employer.noDescription')}
+                  </div>
+                ) : (
+                  <textarea
+                    name="description"
+                    value={form.description}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                    placeholder={t('dashboard.employer.placeholders.description')}
+                    rows={3}
+                  />
+                )}
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Company Description</label>
-              <textarea name="description" value={form.description} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" placeholder="Tell us about your company..." rows={3} />
-            </div>
-            <div className="grid md:grid-cols-3 gap-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Phone</label>
-                <input name="phone" value={form.phone} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" placeholder="+1 (555) 000-0000" required />
+              <div className="grid md:grid-cols-3 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.phone')}</label>
+                  {tenantFieldsReadOnly ? (
+                    <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm">
+                      {form.phone || t('common.notProvided')}
+                    </div>
+                  ) : (
+                    <input
+                      name="phone"
+                      value={form.phone}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="+1 (555) 000-0000"
+                      required
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.email')}</label>
+                  {tenantFieldsReadOnly ? (
+                    <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm">
+                      {form.company_email || t('common.notProvided')}
+                    </div>
+                  ) : (
+                    <input
+                      name="company_email"
+                      value={form.company_email}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="contact@company.com"
+                      type="email"
+                      required
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">{t('dashboard.employer.labels.orgNumber')}</label>
+                  {tenantFieldsReadOnly ? (
+                    <div className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm">
+                      {form.org_number || t('common.notProvided')}
+                    </div>
+                  ) : (
+                    <input
+                      name="org_number"
+                      value={form.org_number}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="123-456-789"
+                      required
+                    />
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Company Email</label>
-                <input name="company_email" value={form.company_email} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" placeholder="contact@company.com" type="email" required />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-100">
+                {!canEditTenantDetails ? (
+                  <p className="text-xs text-gray-500">{t('dashboard.employer.ownerUpdateOnly')}</p>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={tenantUpdateDisabled}
+                    className={`px-6 py-3 rounded-lg font-semibold shadow-sm transition-all ${tenantUpdateDisabled ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-white'}`}
+                  >
+                    {savingTenant ? t('common.saving') : t(`dashboard.employer.${tenant?.status === 'approved' ? 'updateBtn' : 'requestApprovalBtn'}`)}
+                  </button>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Org. Number</label>
-                <input name="org_number" value={form.org_number} onChange={handleChange} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" placeholder="123-456-789" required />
-              </div>
-            </div>
-            <div className="flex justify-end pt-4 border-t border-gray-100">
-              <button
-                type="submit"
-                disabled={savingTenant}
-                className={`px-6 py-3 rounded-lg font-semibold shadow-sm transition-all ${savingTenant ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-white'}`}
-              >
-                {savingTenant ? 'Saving...' : (tenant?.status === 'approved' ? 'Update Details' : 'Save & Request Approval')}
-              </button>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
         </div>
 
         {/* Tabs Navigation */}
@@ -404,16 +535,15 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
             <div className="flex border-b border-gray-200">
               <button
                 onClick={() => setActiveTab('jobs')}
-                className={`flex-1 px-6 py-4 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
-                  activeTab === 'jobs'
-                    ? 'text-primary border-b-2 border-primary bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`flex-1 px-6 py-4 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${activeTab === 'jobs'
+                  ? 'text-primary border-b-2 border-primary bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                Job Postings ({jobs.length})
+                {t('dashboard.employer.tabs.jobs')} Postings ({jobs.length})
               </button>
             </div>
           </div>
@@ -431,20 +561,19 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
-                      Your Job Postings
+                      {t('dashboard.employer.jobsHeader')}
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-1">Manage Listings</h2>
-                    {tenant && (
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('dashboard.employer.manageListings')}</h2>
+                    {tenant && effectiveRole === 'owner' && (
                       <div className="mt-2 text-sm text-slate-600">
-                        <span className="font-semibold">Tenant status:</span>
+                        <span className="font-semibold">{t('dashboard.employer.tenantStatus')}:</span>
                         <span
-                          className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-2 ${
-                            tenant.status === 'approved'
-                              ? 'bg-green-50 text-green-700 border border-green-200'
-                              : tenant.status === 'rejected'
-                                ? 'bg-red-50 text-red-700 border border-red-200'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}
+                          className={`ml-2 px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-2 ${tenant.status === 'approved'
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : tenant.status === 'rejected'
+                              ? 'bg-red-50 text-red-700 border border-red-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}
                         >
                           <span className="h-2 w-2 rounded-full"
                             style={{ backgroundColor: tenant.status === 'approved' ? '#16a34a' : tenant.status === 'rejected' ? '#dc2626' : '#d97706' }}
@@ -452,21 +581,25 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
                           {tenant.status}
                         </span>
                         {missingContact && (
-                          <span className="ml-3 text-red-600 font-semibold">Add company phone, email, and org. nr to unlock posting.</span>
+                          <span className="ml-3 text-red-600 font-semibold">{t('dashboard.employer.unlockPostingHint')}</span>
                         )}
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={onCreateJob}
-                    disabled={createDisabled}
-                    className={`px-6 py-3 rounded-lg font-semibold shadow-sm transition-all flex items-center gap-2 ${createDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-white'}`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Job
-                  </button>
+                  {(effectiveRole === 'owner' || effectiveRole === 'manager' || effectivePermissions.can_post_job) ? (
+                    <button
+                      onClick={onCreateJob}
+                      disabled={createDisabled}
+                      className={`px-6 py-3 rounded-lg font-semibold shadow-sm transition-all flex items-center gap-2 ${createDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-white'}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      {t('dashboard.employer.actions.createJob')}
+                    </button>
+                  ) : (
+                    <span className="px-6 py-3 rounded-lg bg-gray-100 text-gray-500 font-semibold">{t('dashboard.employer.managerOnlyHint')}</span>
+                  )}
                 </div>
 
                 {jobs.length === 0 && (
@@ -476,25 +609,25 @@ export function EmployerDashboard({ jobs = [], onSelectJob, onCreateJob, tenant,
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                     </div>
-                    <p className="text-gray-600 mb-4 text-lg font-medium">You haven't posted any jobs yet</p>
+                    <p className="text-gray-600 mb-4 text-lg font-medium">{t('dashboard.employer.noJobsYet')}</p>
                     <button
                       onClick={onCreateJob}
                       disabled={createDisabled}
                       className={`px-6 py-3 rounded-lg font-semibold shadow-sm mx-auto ${createDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-white'}`}
                     >
-                      Post your first job
+                      {t('dashboard.employer.actions.postFirstJob')}
                     </button>
                     {createDisabled && (
-                      <p className="text-sm text-gray-500 mt-2">Complete company details and wait for admin approval.</p>
+                      <p className="text-sm text-gray-500 mt-2">{t('dashboard.employer.completeDetailsHint')}</p>
                     )}
                   </div>
                 )}
 
                 <div className="space-y-3">
                   {jobs.map((job) => (
-                    <JobCard 
-                      key={job.id} 
-                      job={job} 
+                    <JobCard
+                      key={job.id}
+                      job={job}
                       onSelect={onSelectJob}
                       onEdit={onEditJob ? () => onEditJob(job) : null}
                       onTogglePublish={onTogglePublish ? () => onTogglePublish(job) : null}

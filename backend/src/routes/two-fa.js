@@ -9,9 +9,9 @@ import { validateRequest, isValidEmail } from '../utils/validation.js'
 const router = Router()
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret'
 
-// Helper: Generate device fingerprint
-const generateDeviceFingerprint = (userAgent, ip) => {
-  const fingerprint = `${userAgent}|${ip}`
+// Helper: Generate device fingerprint (must match login logic: userAgent + deviceId)
+const generateDeviceFingerprint = (userAgent, deviceId = 'unknown') => {
+  const fingerprint = `${userAgent}|${deviceId}`
   return crypto.createHash('sha256').update(fingerprint).digest('hex')
 }
 
@@ -295,13 +295,12 @@ router.post('/send-code', async (req, res) => {
 // POST /auth/2fa/login-verify - Verify 2FA code during login
 router.post('/login-verify', async (req, res) => {
   try {
-    const { userId, code, trustDevice } = req.body
+    const { userId, code, trustDevice, deviceId, rememberMe } = req.body
 
     if (!userId || !code) {
       return res.status(400).json({ error: 'userId and code are required' })
     }
 
-    // Verify code
     const codeResult = await query(
       `SELECT id, user_id FROM two_fa_codes 
        WHERE user_id = $1 AND code = $2 AND used_at IS NULL AND expires_at > NOW()
@@ -314,11 +313,8 @@ router.post('/login-verify', async (req, res) => {
     }
 
     const codeId = codeResult.rows[0].id
-
-    // Mark code as used
     await query('UPDATE two_fa_codes SET used_at = NOW() WHERE id = $1', [codeId])
 
-    // Get user and generate full login token
     const userResult = await query(
       'SELECT id, email, role FROM users WHERE id = $1',
       [userId]
@@ -330,7 +326,6 @@ router.post('/login-verify', async (req, res) => {
 
     const user = userResult.rows[0]
 
-    // Get candidateId if candidate
     let candidateId = null
     if (user.role === 'candidate') {
       const candResult = await query('SELECT id FROM candidate_profiles WHERE user_id = $1', [userId])
@@ -339,7 +334,14 @@ router.post('/login-verify', async (req, res) => {
       }
     }
 
-    // Generate JWT token
+    const userAgent = req.get('user-agent') || 'Unknown'
+    const deviceLabel = deriveDeviceLabel(userAgent)
+    const normalizedDeviceId = deviceId || req.get('x-device-id') || 'unknown'
+    const deviceFingerprint = generateDeviceFingerprint(userAgent, normalizedDeviceId)
+    const rememberRequested = !!rememberMe
+    const shouldTrustDevice = !!trustDevice
+    const longLived = shouldTrustDevice || rememberRequested
+
     const tokenJti = crypto.randomUUID()
     const token = jwt.sign(
       {
@@ -347,41 +349,52 @@ router.post('/login-verify', async (req, res) => {
         email: user.email,
         role: user.role,
         jti: tokenJti,
+        longLived
       },
       jwtSecret,
-      { expiresIn: '7d' }
+      { expiresIn: longLived ? '30d' : '7d' }
     )
 
-    // Store session for all logins; trusted flag controls 30-day window
-    const userAgent = req.get('user-agent') || 'Unknown'
-    const deviceLabel = deriveDeviceLabel(userAgent)
-    const deviceFingerprint = generateDeviceFingerprint(userAgent, req.ip)
-    const expiresAt = trustDevice
+    const expiresAt = longLived
       ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const trustedAtValue = shouldTrustDevice ? new Date() : null
 
-    // Properly save the trusted device with correct SQL
-    const updateQuery = trustDevice
-      ? `UPDATE two_fa_sessions 
-         SET expires_at = $3, device_label = $4, user_agent = $5, ip_address = $6, token_jti = $7, revoked_at = NULL, trusted_at = NOW()
-         WHERE user_id = $1 AND device_fingerprint = $2`
-      : `UPDATE two_fa_sessions 
-         SET expires_at = $3, device_label = $4, user_agent = $5, ip_address = $6, token_jti = $7, revoked_at = NULL
-         WHERE user_id = $1 AND device_fingerprint = $2`
+    let upserted = false
+    try {
+      const upsertResult = await query(
+        `INSERT INTO two_fa_sessions (user_id, device_fingerprint, expires_at, device_label, user_agent, ip_address, trusted_at, token_jti, revoked_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL)
+         ON CONFLICT (user_id, device_fingerprint) DO UPDATE
+         SET expires_at = EXCLUDED.expires_at,
+             device_label = EXCLUDED.device_label,
+             user_agent = EXCLUDED.user_agent,
+             ip_address = EXCLUDED.ip_address,
+             token_jti = EXCLUDED.token_jti,
+             revoked_at = NULL,
+             trusted_at = CASE WHEN EXCLUDED.trusted_at IS NOT NULL THEN EXCLUDED.trusted_at ELSE two_fa_sessions.trusted_at END`,
+        [user.id, deviceFingerprint, expiresAt, deviceLabel, userAgent, req.ip, trustedAtValue, tokenJti]
+      )
+      upserted = upsertResult.rowCount > 0
+    } catch (err) {
+      console.error('2FA trusted device upsert failed:', err)
+    }
 
-    const updateResult = await query(
-      updateQuery,
-      [user.id, deviceFingerprint, expiresAt, deviceLabel, userAgent, req.ip, tokenJti]
-    )
-
-    // If no existing session, insert new one
-    if (updateResult.rowCount === 0) {
+    if (!shouldTrustDevice) {
       await query(
-        `INSERT INTO two_fa_sessions (user_id, device_fingerprint, expires_at, device_label, user_agent, ip_address, trusted_at, token_jti, revoked_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, ${trustDevice ? 'NOW()' : 'NULL'}, $7, NULL)`,
-        [user.id, deviceFingerprint, expiresAt, deviceLabel, userAgent, req.ip, tokenJti]
+        `UPDATE two_fa_sessions SET revoked_at = NOW() WHERE user_id = $1 AND token_jti != $2 AND revoked_at IS NULL AND (trusted_at IS NULL OR trusted_at < NOW() - INTERVAL '29 days')`,
+        [user.id, tokenJti]
       )
     }
+
+    console.log('2FA device trust flow', {
+      userId: user.id,
+      deviceFingerprint,
+      trusted: shouldTrustDevice,
+      rememberRequested,
+      longLived,
+      upserted
+    })
 
     res.json({
       success: true,
@@ -392,6 +405,7 @@ router.post('/login-verify', async (req, res) => {
         role: user.role,
       },
       candidateId,
+      rememberMe: longLived,
       redirectTo: '/' // Default redirect
     })
   } catch (err) {

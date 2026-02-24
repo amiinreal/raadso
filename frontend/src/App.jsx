@@ -1,11 +1,20 @@
-import { useEffect, useState, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { ForgotPassword } from './pages/ForgotPassword'
+import { ResetPassword } from './pages/ResetPassword'
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
+import AcceptTenantInvitation from './pages/AcceptTenantInvitation.jsx'
 import { Navbar } from './components/Navbar'
 import { Footer } from './components/Footer'
 import { Landing } from './pages/Landing'
 import { Dashboard } from './pages/Dashboard'
 import { EmployerDashboard } from './pages/EmployerDashboard'
-import { AdminDashboard } from './pages/AdminDashboard'
+import { AdminDashboardNew } from './pages/AdminDashboardNew'
+import { TenantsManagementNew } from './pages/TenantsManagementNew'
+import { UsersDirectoryNew } from './pages/UsersDirectoryNew'
+import { EmployersManagementNew } from './pages/EmployersManagementNew'
+import { CandidatesManagementNew } from './pages/CandidatesManagementNew'
+import { TranslationPortalNew } from './pages/TranslationPortalNew'
+import { AutomationSettingsNew } from './pages/AutomationSettingsNew'
 import { AdminLogin } from './pages/AdminLogin'
 import { Jobs } from './pages/Jobs'
 import { ApplyJob } from './pages/ApplyJob'
@@ -13,6 +22,7 @@ import { Profile } from './pages/Profile'
 import { CandidateApplicationsPage } from './pages/CandidateApplicationsPage'
 import { JobSelectionList } from './pages/JobSelectionList'
 import { ApplicantReviewDashboard } from './pages/ApplicantReviewDashboard'
+import { EmployerApplications } from './pages/EmployerApplications'
 import { Auth } from './pages/Auth'
 import { ProfileEdit } from './pages/ProfileEdit'
 import { JobForm } from './pages/JobForm'
@@ -21,14 +31,26 @@ import { CompanyProfile } from './pages/CompanyProfile'
 import { CompanyEdit } from './pages/CompanyEdit'
 import { TwoFASetup } from './pages/TwoFASetup'
 import { TwoFAVerify } from './pages/TwoFAVerify'
+import { PlatformLegal } from './pages/PlatformLegal'
+import { SiteNotice } from './components/SiteNotice'
+import { TermsAgreementModal } from './components/TermsAgreementModal'
 import { TenantMembers } from './pages/TenantMembers'
 import { Settings } from './pages/Settings'
 import { SavedSearch } from './pages/SavedSearch'
 import { api } from './api/api'
+import InvitedUserOnboard from './pages/InvitedUserOnboard'
+import TenantPermissions from './pages/TenantPermissions'
+import { useTranslation } from './i18n/TranslationProvider'
+import { ServerDownPage } from './components/ServerDownPage'
+import { useServerStatus } from './hooks/useServerStatus'
+import { ServerDownBanner } from './components/ServerDownBanner'
 
 const SESSION_DURATION = 30 * 60 * 1000
 const WARNING_BEFORE_EXPIRY = 5 * 60 * 1000
 const INACTIVITY_THRESHOLD = 5 * 60 * 1000
+
+// Helper to check if Remember Me is enabled
+const isRememberMe = () => localStorage.getItem('job-platform-remember-me') === '1'
 
 const demoJobs = [
   {
@@ -64,7 +86,9 @@ const demoCandidate = {
 }
 
 const EditJobWrapper = ({ tenant, selectedJob, jobs, token, user, onLoadJobs, onNavigate }) => {
+  // Call all hooks at the top level before any conditional returns
   const { id } = useParams()
+  const { buildPath } = useTranslation()
   const job = selectedJob || jobs?.find(j => String(j.id) === id || j.ad_number === id)
 
   useEffect(() => {
@@ -73,19 +97,22 @@ const EditJobWrapper = ({ tenant, selectedJob, jobs, token, user, onLoadJobs, on
     }
   }, [job, onLoadJobs])
 
+  // Only render content if job exists
   if (!job) return null
+
   return (
     <JobForm
       tenant={tenant}
+      currentUser={user}
       initialJob={job}
       onSubmit={async (form) => {
         await api.updateJob(job.id, form, token)
         if (onLoadJobs && user) {
           await onLoadJobs()
         }
-        if (onNavigate) onNavigate('/jobs')
+        if (onNavigate) onNavigate(buildPath('jobs'))
       }}
-      onCancel={() => onNavigate ? onNavigate('/jobs') : null}
+      onCancel={() => onNavigate ? onNavigate(buildPath('jobs')) : null}
       saving={false}
     />
   )
@@ -95,11 +122,31 @@ const AppContent = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const fetchCache = useRef(new Map())
+  const { locale, buildPath, supportedLocales } = useTranslation()
+  const { status: serverStatus, isDown } = useServerStatus()
+
+  // Show server down page if server is offline or in maintenance mode
+  if (isDown && serverStatus?.maintenanceMode) {
+    return <ServerDownPage />
+  }
+
+  const pathSegments = location.pathname.split('/').filter(Boolean)
+  const pathWithoutLocale = pathSegments.length && supportedLocales.includes(pathSegments[0])
+    ? `/${pathSegments.slice(1).join('/')}`
+    : location.pathname
+  const normalizedPath = pathWithoutLocale || '/'
+  const localizedLocation = useMemo(() => ({
+    ...location,
+    pathname: normalizedPath,
+  }), [location, normalizedPath])
 
   // Get admin route path from environment (default to 'portal-secret123')
   // MUST be defined before deriveTabFromPath uses it
+  // Get admin route path from environment (default to 'portal-secret123')
+  // MUST be defined before deriveTabFromPath uses it
   const adminRoutePath = import.meta.env.VITE_ADMIN_ROUTE_PATH || 'portal-secret123'
-  const adminRoute = `/admin-${adminRoutePath}`
+  const adminRouteSlug = `admin-${adminRoutePath}`
+  const adminRouteWithSlash = `/${adminRouteSlug}`
 
   const [token, setToken] = useState(localStorage.getItem('job-platform-token'))
   const [user, setUser] = useState(null)
@@ -120,29 +167,60 @@ const AppContent = () => {
   const [searchParams, setSearchParams] = useState({ search: '', location: '' })
   const [selectedCompanyId, setSelectedCompanyId] = useState(null)
   // Derive initial tab from current path to avoid redirecting on reload
-  const deriveTabFromPath = (path) => {
+  const deriveTabFromPath = useCallback((path) => {
     if (path.startsWith('/jobs')) return 'jobs'
     if (path.startsWith('/companies') && path !== '/companies') return 'company-profile'
     if (path === '/companies') return 'companies'
     if (path === '/profile') return 'profile'
     if (path.startsWith('/applications')) return 'applications'
     if (path === '/create-job') return 'create-job'
-    if (path === adminRoute || path.startsWith(adminRoute)) return 'admin'
+    if (path === adminRouteWithSlash || path.startsWith(`${adminRouteWithSlash}/`)) return 'admin'
     if (path === '/settings') return 'settings'
     if (path === '/login' || path === '/register') return 'auth'
     if (path.startsWith('/apply')) return 'apply'
     if (path.startsWith('/saved-search')) return 'saved-search'
+    if (path.startsWith('/tenant-members') || (path.startsWith('/tenants/') && path.includes('/permissions')))
+      return 'team-members'
     return 'dashboard'
-  }
-  const [activeTab, setActiveTab] = useState(deriveTabFromPath(location.pathname))
+  }, [adminRouteWithSlash])
+  const [activeTab, setActiveTab] = useState(() => deriveTabFromPath(normalizedPath))
+  const [termsVersion, setTermsVersion] = useState('1.0.0')
+
+  // Load current terms version
+  useEffect(() => {
+    api.getTermsVersion()
+      .then(res => setTermsVersion(res.version))
+      .catch(err => console.error('Failed to load terms version', err))
+  }, [])
   const [savingProfile, setSavingProfile] = useState(false)
   const [showSessionWarning, setShowSessionWarning] = useState(false)
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
   const [authMode, setAuthMode] = useState('login')
   const [pending2FAUserId, setPending2FAUserId] = useState(() => localStorage.getItem('pending-2fa-user-id'))
+  // Role switching state, persisted across reloads
+  const [activeRole, setActiveRole] = useState(null)
+  const fetchUserPreferences = useCallback(async () => {
+    if (!token) return null
+    try {
+      return await api.getUserPreferences(token)
+    } catch (err) {
+      console.warn('Failed to load user preferences', err)
+      return null
+    }
+  }, [token])
 
-  const isAdminRoute = location.pathname.startsWith(adminRoute)
+  const persistUserPreferences = useCallback(async (payload = {}) => {
+    if (!token) return
+    if (!payload || !Object.keys(payload).length) return
+    try {
+      await api.updateUserPreferences(payload, token)
+    } catch (err) {
+      console.warn('Failed to persist user preferences', err)
+    }
+  }, [token])
+
+  const isAdminRoute = normalizedPath === adminRouteWithSlash || normalizedPath.startsWith(`${adminRouteWithSlash}/`)
 
   // Check for expired session redirect
   useEffect(() => {
@@ -161,14 +239,17 @@ const AppContent = () => {
 
   // Redirect authenticated users away from auth pages
   useEffect(() => {
-    if (token && (location.pathname === '/login' || location.pathname === '/register')) {
-      navigate('/', { replace: true })
+    if (token && (normalizedPath === '/login' || normalizedPath === '/register')) {
+      navigate(buildPath(''), { replace: true })
     }
-  }, [token, location.pathname])
+  }, [token, normalizedPath, buildPath, navigate])
 
   const persistAuth = async (res) => {
     setToken(res.token)
     setUser(res.user)
+    if (res.user?.last_active_role) {
+      setActiveRole(res.user.last_active_role)
+    }
     setCandidateId(res.candidateId || null)
     localStorage.setItem('job-platform-token', res.token)
     localStorage.setItem('job-platform-login-time', Date.now().toString())
@@ -183,28 +264,61 @@ const AppContent = () => {
     setUser(null)
     setCandidateId(null)
     setTenant(null)
+    // Clear all 2FA and session state
     localStorage.removeItem('job-platform-token')
     localStorage.removeItem('job-platform-login-time')
     localStorage.removeItem('job-platform-remember-me')
+    localStorage.removeItem('pending-2fa-user-id')
+    localStorage.removeItem('pending-2fa-redirect')
+    localStorage.removeItem('pending-remember-me')
+    setActiveRole(null)
   }
 
   const extendSession = () => setLastActivity(Date.now())
 
-  const trackActivity = () => {
-    if (token) setLastActivity(Date.now())
-  }
 
-  const loadJobs = async ({ role, token: authToken } = {}) => {
+
+  const loadJobs = async ({ role, token: authToken, tenantId } = {}) => {
     try {
-      const data = await api.getJobs({}, role === 'employer' ? authToken : undefined)
+      if (role) {
+        setJobs([])
+        setSelectedJob(null)
+      }
+      const effectiveRole = role || user?.role
+      const queryParams = {}
+      let tokenToUse = undefined
+
+      if (effectiveRole === 'employer') {
+        const resolvedTenantId = tenantId || activeRole?.tenantId || tenant?.id || user?.tenant_id
+        if (!resolvedTenantId) {
+          console.warn('No tenant context available for employer job load')
+          setJobs([])
+          setSelectedJob(null)
+          return
+        }
+        queryParams.tenantId = resolvedTenantId
+        tokenToUse = authToken || token || localStorage.getItem('job-platform-token')
+      }
+
+      const data = await api.getJobs(queryParams, tokenToUse)
       setJobs(data)
-      setSelectedJob(data[0] || null)
+      setSelectedJob((prev) => {
+        if (!prev) return data[0] || null
+        return data.find((job) => job.id === prev.id) || data[0] || null
+      })
     } catch (err) {
-      console.warn('Falling back to demo jobs', err)
-      setJobs(demoJobs)
-      setSelectedJob(demoJobs[0])
+      console.warn('Failed to load jobs:', err)
+      // Don't show demo jobs - show server error instead
+      setJobs([])
+      setSelectedJob(null)
     }
   }
+
+  // Memoize the callback to prevent infinite loops in EditJobWrapper's useEffect
+  const onLoadJobsCallback = useCallback(
+    () => loadJobs({ role: user?.role, token, tenantId: tenant?.id || activeRole?.tenantId }),
+    [user?.role, token, tenant?.id, activeRole?.tenantId]
+  )
 
   const loadCandidate = async (id) => {
     try {
@@ -222,7 +336,7 @@ const AppContent = () => {
       if (candidates.length) {
         const primary = candidates[0]
         await loadCandidate(primary.id)
-        await loadApplications(primary.id)
+        await loadApplications({ id: primary.id, authToken: token, scope: 'candidate' })
       } else {
         setCandidate(demoCandidate)
       }
@@ -233,9 +347,34 @@ const AppContent = () => {
     }
   }
 
-  const loadApplications = async (id) => {
+  const loadApplications = async ({ id, tenantId, authToken, scope } = {}) => {
     try {
-      const data = await api.getApplications(id)
+      const effectiveToken = typeof authToken !== 'undefined'
+        ? authToken
+        : (token || localStorage.getItem('job-platform-token'))
+
+      if (!effectiveToken) {
+        setApplications([])
+        return
+      }
+
+      let data = []
+      if (scope === 'employer') {
+        const resolvedTenantId = tenantId || activeRole?.tenantId || tenant?.id || user?.tenant_id
+        if (!resolvedTenantId) {
+          console.warn('Missing tenant context for employer applications')
+          setApplications([])
+          return
+        }
+        data = await api.getApplications({ tenantId: resolvedTenantId }, effectiveToken)
+      } else {
+        const candidateIdToUse = id || candidateId
+        if (!candidateIdToUse) {
+          setApplications([])
+          return
+        }
+        data = await api.getApplications(candidateIdToUse, effectiveToken)
+      }
       setApplications(data)
     } catch (err) {
       console.warn('Falling back to empty applications', err)
@@ -243,13 +382,44 @@ const AppContent = () => {
     }
   }
 
-  const loadEmployerTenant = async (userId, authToken) => {
+  const loadEmployerTenant = async (userId, authToken, preferredTenantId) => {
     try {
       const list = await api.getTenants({ userId }, authToken)
-      setTenant(list[0] || null)
+      if (!list.length) {
+        setTenant(null)
+        return null
+      }
+
+      const activeTenantId = activeRole?.type === 'employer' ? activeRole?.tenantId : null
+      let selected = null
+
+      if (preferredTenantId) {
+        selected = list.find(t => t.id === preferredTenantId) || null
+      }
+      if (!selected && activeTenantId) {
+        selected = list.find(t => t.id === activeTenantId) || null
+      }
+      if (!selected) {
+        selected = list[0]
+      }
+
+      setTenant(selected)
+      setUser(prev => (prev ? { ...prev, tenant_id: selected?.id || prev.tenant_id } : prev))
+
+      if (selected && user?.role === 'employer' && activeRole?.type !== 'candidate') {
+        const alreadyMatching = activeRole?.type === 'employer' && activeRole?.tenantId === selected.id
+        if (!alreadyMatching) {
+          const nextRole = { type: 'employer', tenantId: selected.id, role: 'employer' }
+          setActiveRole(nextRole)
+          persistUserPreferences({ activeRole: nextRole })
+        }
+      }
+
+      return selected
     } catch (err) {
       console.warn('Failed to load tenant', err)
       setTenant(null)
+      return null
     }
   }
 
@@ -277,7 +447,7 @@ const AppContent = () => {
       setCandidateId(me.candidateId || null)
       if (me.candidateId) {
         await loadCandidate(me.candidateId)
-        await loadApplications(me.candidateId)
+        await loadApplications({ id: me.candidateId, authToken: token, scope: 'candidate' })
       }
       setTimeout(() => fetchCache.current.delete(cacheKey), 2000)
       return { user: me.user, candidateId: me.candidateId }
@@ -299,11 +469,55 @@ const AppContent = () => {
       setLoading(true)
       if (token) {
         const authed = await fetchAuthedUser()
-        await loadJobs({ role: authed?.user?.role, token })
-        if (authed?.user?.role === 'employer') {
-          await loadEmployerTenant(authed.user.id, token)
+        const prefs = await fetchUserPreferences()
+        let resolvedActiveRole = activeRole
+
+        // Priority: 1. State (activeRole), 2. User DB Column (last_active_role), 3. User Preferences Table
+        if (!resolvedActiveRole) {
+          if (authed?.user?.last_active_role) {
+            resolvedActiveRole = authed.user.last_active_role
+            setActiveRole(resolvedActiveRole)
+          } else if (prefs?.activeRole) {
+            resolvedActiveRole = prefs.activeRole
+            setActiveRole(prefs.activeRole)
+          }
         }
-        if (authed?.user?.role === 'admin') {
+
+        const hasQueryParams = !!location.search
+        if (!hasQueryParams && !searchParams.search && !searchParams.location && (prefs?.lastJobsSearch || prefs?.lastJobsLocation)) {
+          setSearchParams({
+            search: prefs.lastJobsSearch || '',
+            location: prefs.lastJobsLocation || '',
+          })
+        }
+
+        const desiredRole = resolvedActiveRole?.type || authed?.user?.role
+        const preferredTenantId = resolvedActiveRole?.tenantId
+        let employerTenant = null
+
+        if (desiredRole === 'employer') {
+          employerTenant = await loadEmployerTenant(authed?.user?.id, token, preferredTenantId)
+          if (employerTenant?.id) {
+            await loadApplications({ tenantId: employerTenant.id, authToken: token, scope: 'employer' })
+          }
+        } else if (authed?.user?.role === 'employer') {
+          employerTenant = await loadEmployerTenant(authed.user.id, token)
+          if (employerTenant?.id) {
+            await loadApplications({ tenantId: employerTenant.id, authToken: token, scope: 'employer' })
+          }
+        }
+
+        await loadJobs({
+          role: desiredRole || authed?.user?.role,
+          token,
+          tenantId: employerTenant?.id || preferredTenantId,
+        })
+
+        if (!employerTenant && desiredRole !== 'employer' && authed?.user?.role !== 'employer' && authed?.candidateId) {
+          await loadApplications({ id: authed.candidateId, authToken: token, scope: 'candidate' })
+        }
+
+        if (desiredRole === 'admin' || authed?.user?.role === 'admin') {
           await loadAllTenants(token)
         }
       } else {
@@ -313,26 +527,105 @@ const AppContent = () => {
       setLoading(false)
     }
     bootstrap()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
+
+  // Apply persisted active role once user + token are available
+  useEffect(() => {
+    if (!user || !token) return
+    const applyRole = async () => {
+      let roleToUse = activeRole
+      if (!roleToUse) {
+        // Default to backend role if nothing persisted yet
+        roleToUse = {
+          type: user.role,
+          tenantId: user.tenant_id,
+          role: user.role,
+        }
+        setActiveRole(roleToUse)
+        persistUserPreferences({ activeRole: roleToUse })
+      }
+
+      if (roleToUse.type === 'employer' && roleToUse.tenantId) {
+        try {
+          // Fetch full tenant details (including status, members, etc.)
+          console.log('Fetching full tenant with token:', { roleToUse, tenantId: roleToUse.tenantId, hasToken: !!token })
+          const fullTenant = await api.getTenant(roleToUse.tenantId, token)
+          console.log('Got full tenant:', { id: fullTenant.id, membersCount: fullTenant.members?.length, members: fullTenant.members })
+          setTenant(fullTenant)
+        } catch (err) {
+          console.error('Failed to load tenant for active role', err)
+        }
+      } else if (roleToUse.type === 'candidate') {
+        // Candidate context should not keep a tenant selected
+        setTenant(null)
+      }
+    }
+    applyRole()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, token])
+
+  // Track activity to reset session timer
+  // Use useCallback to ensure the function reference is stable but updates when token changes
+  const trackActivity = useCallback(() => {
+    if (token) {
+      setLastActivity(Date.now())
+    }
   }, [token])
 
   useEffect(() => {
     if (!token) return
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click']
+    // Use a throttled wrapper or just the raw function? 
+    // Raw function is fine for now, React state updates are batched/efficient enough.
+    // Ensure we remove the specific listener we added
     events.forEach(event => window.addEventListener(event, trackActivity))
     return () => events.forEach(event => window.removeEventListener(event, trackActivity))
-  }, [token])
+  }, [token, trackActivity]) // Depending on trackActivity ensures listeners update if function changes
 
   useEffect(() => {
     if (!token) return
-    // Session check disabled - users stay logged in indefinitely
-    setSessionTimeRemaining(null)
-    if (showSessionWarning) setShowSessionWarning(false)
-  }, [token, showSessionWarning])
+
+    // If Remember Me is enabled, we don't enforce the short session timer
+    if (isRememberMe()) {
+      setSessionTimeRemaining(null)
+      if (showSessionWarning) setShowSessionWarning(false)
+      return
+    }
+
+    // Interval to check session expiry
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const timeSinceLast = now - lastActivity
+      const timeLeft = SESSION_DURATION - timeSinceLast
+
+      setSessionTimeRemaining(Math.max(0, Math.floor(timeLeft / 1000)))
+
+      if (timeLeft <= WARNING_BEFORE_EXPIRY && timeLeft > 0) {
+        setShowSessionWarning(true)
+      } else if (timeLeft <= 0) {
+        setShowSessionWarning(false)
+        logout()
+        setAuthError('Your session has expired due to inactivity. Please login again.')
+      } else {
+        // If active and plenty of time left, ensure warning is hidden
+        if (showSessionWarning) setShowSessionWarning(false)
+
+        // OPTIONAL: Active Session Sliding
+        // If the user is active (timeSinceLast < 1 min) but we are 
+        // approaching a backend token expiry (not tracked here yet), we could refresh.
+        // For now, determining backend expiry requires decoding the token.
+        // Let's assume the 30m frontend timer is the primary concern for "Session Expired".
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [token, lastActivity, showSessionWarning])
 
   // Sync activeTab from URL on every pathname change. This is read-only; 
   // the URL is the source of truth, not the tab state.
   useEffect(() => {
-    const path = location.pathname
+    const path = normalizedPath
     let newTab = 'dashboard'
     if (path.startsWith('/jobs')) newTab = 'jobs'
     else if (path.startsWith('/companies') && path !== '/companies') newTab = 'company-profile'
@@ -340,7 +633,7 @@ const AppContent = () => {
     else if (path === '/profile') newTab = 'profile'
     else if (path.startsWith('/applications')) newTab = 'applications'
     else if (path === '/create-job') newTab = 'create-job'
-    else if (path === adminRoute || path.startsWith(adminRoute)) newTab = 'admin'
+    else if (path === adminRouteWithSlash || path.startsWith(`${adminRouteWithSlash}/`)) newTab = 'admin'
     else if (path === '/settings') newTab = 'settings'
     else if (path.startsWith('/saved-search')) newTab = 'saved-search'
     else if (path === '/login' || path === '/register') newTab = 'auth'
@@ -353,7 +646,7 @@ const AppContent = () => {
       const id = path.split('/')[2]
       if (id && id !== selectedCompanyId) setSelectedCompanyId(id)
     }
-  }, [location.pathname])
+  }, [normalizedPath, activeTab, adminRouteWithSlash, selectedCompanyId])
 
   useEffect(() => {
     if (activeTab === 'jobs' && selectedJob) {
@@ -366,18 +659,18 @@ const AppContent = () => {
 
   const handleSelectJob = (job) => {
     setSelectedJob(job)
-    navigate('/jobs')
+    navigate(buildPath('jobs'))
   }
 
   const handleEditJob = (job) => {
     setSelectedJob(job)
-    navigate(`/edit-job/${job.id}`)
+    navigate(buildPath(`edit-job/${job.id}`))
   }
 
   const handleTogglePublish = async (job) => {
     try {
       await api.toggleJobPublish(job.id, !job.active, token)
-      await loadJobs({ role: user.role, token })
+      await loadJobs({ role: user.role, token, tenantId: tenant?.id || activeRole?.tenantId })
       alert(job.active ? 'Job unpublished successfully' : 'Job published successfully')
     } catch (err) {
       console.error('Failed to toggle job status', err)
@@ -389,8 +682,8 @@ const AppContent = () => {
     setSubmitting(true)
     try {
       await api.createJob(form, token)
-      await loadJobs({ role: user.role, token })
-      navigate('/jobs')
+      await loadJobs({ role: user.role, token, tenantId: tenant?.id || activeRole?.tenantId })
+      navigate(buildPath('jobs'))
     } catch (err) {
       console.error('Failed to create job', err)
       alert('Failed to create job')
@@ -402,13 +695,13 @@ const AppContent = () => {
   const handleApply = async (payload) => {
     if (!token && payload.candidateId?.startsWith('demo')) {
       alert('Login and complete your profile before applying.')
-      navigate('/login')
+      navigate(buildPath('login'))
       return
     }
     setSubmitting(true)
     try {
-      await api.createApplication(payload, token)
-      await loadApplications(payload.candidateId)
+      await api.submitApplication(payload, token)
+      await loadApplications({ id: payload.candidateId, authToken: token, scope: 'candidate' })
       setActiveTab('dashboard')
     } catch (err) {
       console.error('Failed to submit application', err)
@@ -426,11 +719,18 @@ const AppContent = () => {
     setAuthLoading(true)
     setAuthError('')
     try {
-      const res = await api.login(creds)
+      // Always use async getDeviceId
+      const { getDeviceId } = await import('./utils/device')
+      const deviceId = await getDeviceId()
+      const res = await api.login({ ...creds, deviceId })
+      // 2FA required
       if (res.requires2FA) {
-        // Persist pending 2FA user so we can show the verify screen even if the app reloads
         localStorage.setItem('pending-2fa-user-id', res.userId)
-        // Store the intended redirect so we can navigate there after 2FA verification
+        if (typeof res.rememberMe !== 'undefined') {
+          localStorage.setItem('pending-remember-me', res.rememberMe ? '1' : '0')
+        } else {
+          localStorage.removeItem('pending-remember-me')
+        }
         if (redirectAfterLogin) {
           localStorage.setItem('pending-2fa-redirect', redirectAfterLogin)
         }
@@ -439,12 +739,15 @@ const AppContent = () => {
         navigate(`/2fa/verify?userId=${res.userId}`)
         return
       }
-      if (res.user.role === 'admin') {
-        setAuthError(`Admin users must login at ${adminRoute}`)
+      // Admin login must use admin route
+      if (res.user && res.user.role === 'admin') {
+        setAuthError(`Admin users must login at ${buildPath(adminRouteSlug)}`)
         setAuthLoading(false)
         return
       }
-      await persistAuth({ ...res, rememberMe: !!creds.rememberMe })
+      // Persist auth info
+      await persistAuth(res)
+      localStorage.removeItem('pending-remember-me')
       if (redirectAfterLogin) {
         navigate(redirectAfterLogin, { replace: true })
         setRedirectAfterLogin(null)
@@ -519,30 +822,95 @@ const AppContent = () => {
 
   const candidateProfile = candidate?.profile
 
-  // If pending 2FA verification, show verify form regardless of token state
-  if (pending2FAUserId) {
+  // Derive effective role context from activeRole (if set) and backend user
+  const effectiveRole = activeRole?.type || user?.role
+  const effectiveTenantId = activeRole?.type === 'employer' && activeRole?.tenantId
+    ? activeRole.tenantId
+    : user?.tenant_id
+  const effectiveUser = user
+    ? { ...user, role: effectiveRole, tenant_id: effectiveTenantId }
+    : null
+
+  const handleRoleSwitch = async (selected) => {
+    setActiveRole(selected)
+    persistUserPreferences({ activeRole: selected })
+
+    // Persist to users table for cross-device memory
+    if (token) {
+      try {
+        await api.updateLastActiveRole(selected, token)
+      } catch (e) {
+        console.warn('Failed to sync active role to user profile', e)
+      }
+    }
+
+    try {
+      if (selected.type === 'candidate') {
+        setUser((u) => (u ? { ...u, role: 'candidate', tenant_id: undefined } : u))
+        setTenant(null)
+        await loadJobs({ role: 'candidate' })
+        const candidateToLoad = selected.candidateId || candidateId
+        if (candidateToLoad) {
+          await loadApplications({ id: candidateToLoad, authToken: token, scope: 'candidate' })
+        }
+      } else if (selected.type === 'employer') {
+        const currentUserId = user?.id || selected.userId
+        setUser((u) => (u ? { ...u, role: 'employer', tenant_id: selected.tenantId || u.tenant_id } : u))
+        const tenantContext = currentUserId
+          ? await loadEmployerTenant(currentUserId, token, selected.tenantId)
+          : await loadEmployerTenant(selected.userId, token, selected.tenantId)
+        const tenantIdForJobs = tenantContext?.id || selected.tenantId || tenant?.id || user?.tenant_id
+        if (tenantIdForJobs) {
+          await loadJobs({ role: 'employer', token, tenantId: tenantIdForJobs })
+          await loadApplications({ tenantId: tenantIdForJobs, authToken: token, scope: 'employer' })
+        } else {
+          setJobs([])
+          setApplications([])
+        }
+      } else if (selected.type === 'admin') {
+        setUser((u) => (u ? { ...u, role: 'admin', tenant_id: undefined } : u))
+        setTenant(null)
+        await loadJobs({ role: 'admin', token })
+      }
+    } catch (err) {
+      console.error('Role switch handling failed', err)
+    }
+  }
+
+  // If pending 2FA verification, show verify form ONLY if not already authenticated and only if pending2FAUserId is set
+  if (pending2FAUserId && !token) {
+    // If user logs out or clears state, do not show 2FA verify page
+    if (!localStorage.getItem('pending-2fa-user-id')) {
+      // Defensive: clear any stray state
+      setPending2FAUserId(null)
+      return (
+        <Navigate to={buildPath('login')} replace />
+      )
+    }
     return (
       <div className="app-shell">
         <Navbar activeTab="auth" onChange={(tab) => {
           if (tab !== 'auth') {
             const routeMap = {
-              'jobs': '/jobs',
-              'companies': '/companies',
-              'dashboard': '/'
+              'jobs': 'jobs',
+              'companies': 'companies',
+              'dashboard': ''
             }
-            if (routeMap[tab]) navigate(routeMap[tab])
+            if (routeMap[tab] !== undefined) navigate(buildPath(routeMap[tab]))
           }
         }} user={user} onLogout={() => {
           setPending2FAUserId(null)
           localStorage.removeItem('pending-2fa-user-id')
+          localStorage.removeItem('pending-2fa-redirect')
           logout()
-          navigate('/login')
-        }} onAuth={() => navigate('/login')} isAuthenticated={false} />
+          navigate(buildPath('login'))
+        }} onAuth={() => navigate(buildPath('login'))} isAuthenticated={false} />
         <div className="app-content">
           <TwoFAVerify onSuccess={() => {
             setPending2FAUserId(null)
             localStorage.removeItem('pending-2fa-user-id')
-            navigate('/', { replace: true })
+            localStorage.removeItem('pending-2fa-redirect')
+            navigate(buildPath(''), { replace: true })
           }} />
         </div>
         <Footer />
@@ -550,77 +918,89 @@ const AppContent = () => {
     )
   }
 
+  // Admin Auth Guards
   if (isAdminRoute) {
     if (!token || !user) {
       return <AdminLogin onLogin={handleAdminLogin} loading={adminAuthLoading} error={adminAuthError} />
     }
     if (user.role !== 'admin') {
       return (
-        <div className="flex items-center justify-center min-h-screen bg-background-light">
-          <div className="bg-white rounded-xl border border-red-200 shadow-lg p-8 max-w-md">
-            <div className="text-center">
-              <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h2>
-              <p className="text-gray-600 mb-6">You don't have permission to access the admin area.</p>
-              <button
-                onClick={() => {
-                  window.history.back()
-                  setActiveTab('dashboard')
-                }}
-                className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors font-semibold"
-              >
-                Go Back to Dashboard
-              </button>
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
+          <div className="bg-white rounded-2xl border border-red-200 shadow-xl p-8 max-w-md w-full text-center">
+            <div className="size-20 bg-red-50 rounded-full flex items-center justify-center text-red-600 mx-auto mb-6">
+              <span className="material-symbols-outlined text-4xl font-bold">lock</span>
             </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Access Denied</h2>
+            <p className="text-slate-500 font-medium leading-relaxed mb-8">
+              This area is restricted to system administrators.
+            </p>
+            <button
+              onClick={() => navigate(buildPath(''))}
+              className="w-full bg-[#1337ec] text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined">arrow_back</span>
+              Return to Platform
+            </button>
           </div>
         </div>
       )
     }
-    return (
-      <div className="app-shell">
-        <Navbar activeTab={activeTab} onChange={setActiveTab} user={user} onLogout={logout} onAuth={() => { }} isAuthenticated={true} token={token} />
-        <div className="app-content">
-          {loading && <div className="grid-card">Loading data...</div>}
-          {!loading && (
-            <AdminDashboard
-              tenants={tenants}
-              token={token}
-              onRefresh={() => loadAllTenants(token)}
-              onSetStatus={async (id, status, rejectionReason) => {
-                await api.updateTenantStatus(id, status, token, rejectionReason)
-                await loadAllTenants(token)
-              }}
-            />
-          )}
-        </div>
-        <Footer />
-      </div>
-    )
   }
 
-  if (!token) {
-    return (
-      <div className="app-shell">
-        <Navbar activeTab={activeTab} onChange={(tab) => {
-          setActiveTab(tab)
-          const routeMap = {
-            'auth': '/login',
-            'jobs': '/jobs',
-            'companies': '/companies',
-            'dashboard': '/'
-          }
-          if (routeMap[tab]) navigate(routeMap[tab])
-        }} user={user} onLogout={logout} onAuth={() => navigate('/login')} isAuthenticated={false} />
-        <div className="app-content">
-          <Routes>
-            <Route path="/" element={
+  const isEmployer = effectiveUser?.role === 'employer'
+  const isCandidate = effectiveUser?.role === 'candidate'
+  const canViewSavedSearch = isCandidate || (effectiveUser == null && !!token)
+
+  const renderApplicationsElement = () => (
+    isCandidate
+      ? <CandidateApplicationsPage />
+      : isEmployer
+        ? <EmployerApplications token={token} user={effectiveUser} jobs={jobs} />
+        : <JobSelectionList />
+  )
+
+  return (
+    <div className="min-h-screen flex flex-col overflow-hidden">
+      {!isAdminRoute && (
+        <Navbar
+          activeTab={activeTab}
+          onChange={(tab) => {
+            setActiveTab(tab)
+            const routeMap = {
+              'dashboard': '',
+              'jobs': 'jobs',
+              'companies': 'companies',
+              'profile': 'profile',
+              'applications': 'applications',
+              'create-job': 'create-job',
+              'admin': adminRouteSlug,
+              'settings': 'settings',
+              'saved-search': 'saved-search',
+              'team-members': 'tenant-members'
+            }
+            if (routeMap[tab] !== undefined) navigate(buildPath(routeMap[tab]))
+          }}
+          user={effectiveUser}
+          onLogout={logout}
+          onAuth={() => navigate(buildPath('login'))}
+          isAuthenticated={!!token}
+          token={token}
+          currentRole={activeRole || (effectiveUser && { type: effectiveUser.role, tenantId: effectiveUser.tenant_id, role: effectiveUser.role })}
+          onRoleSwitch={handleRoleSwitch}
+        />
+      )}
+
+      <div className={`flex-1 flex flex-col ${isAdminRoute ? 'overflow-hidden h-screen' : 'app-content'}`}>
+        {loading && !isAdminRoute && <div className="grid-card">Loading data...</div>}
+        <Routes location={localizedLocation}>
+          <Route path="/2fa/verify" element={<TwoFAVerify />} />
+          <Route path="/invited-user-onboard" element={<InvitedUserOnboard />} />
+
+          <Route path="/" element={
+            !token ? (
               <Landing
                 jobs={jobs}
-                onLogin={() => navigate('/login')}
+                onLogin={() => navigate(buildPath('login'))}
                 onSearch={({ search, location }) => {
                   setSearchParams({ search, location })
                   const params = new URLSearchParams()
@@ -629,161 +1009,94 @@ const AppContent = () => {
                   navigate(`/jobs${params.toString() ? `?${params.toString()}` : ''}`)
                 }}
               />
-            } />
-            <Route path="/login" element={
-              <Auth
-                mode="login"
-                onToggleMode={() => navigate('/register')}
-                onLogin={handleLogin}
-                onRegister={handleRegister}
-                loading={authLoading}
-                error={authError}
-              />
-            } />
-            <Route path="/register" element={
-              <Auth
-                mode="register"
-                onToggleMode={() => navigate('/login')}
-                onLogin={handleLogin}
-                onRegister={handleRegister}
-                loading={authLoading}
-                error={authError}
-              />
-            } />
-            <Route path="/2fa/verify" element={<TwoFAVerify />} />
-            <Route path="/apply" element={<ApplyJob />} />
-            <Route path="/apply/:jobId" element={<ApplyJob />} />
-            <Route path="/jobs/:jobId" element={
-              <Jobs
+            ) : isCandidate ? (
+              <Dashboard jobs={jobs} applications={applications} candidate={candidate} token={token} onSelectJob={handleSelectJob} />
+            ) : isEmployer ? (
+              <EmployerDashboard
                 jobs={jobs}
-                selectedJobId={null}
-                candidateId={candidateId}
                 token={token}
+                tenant={tenant}
                 onSelectJob={handleSelectJob}
-                onApply={(jobId) => {
-                  const applyPath = `/apply/${jobId}`
-                  setRedirectAfterLogin(applyPath)
-                  navigate('/login')
-                }}
-                initialSearch={searchParams.search}
-                initialLocation={searchParams.location}
-              />
-            } />
-            <Route path="/jobs" element={
-              <Jobs
-                jobs={jobs}
-                selectedJobId={selectedJob?.id}
-                candidateId={candidateId}
-                token={token}
-                onSelectJob={handleSelectJob}
-                onApply={(jobId) => {
-                  const applyPath = `/apply/${jobId}`
-                  setRedirectAfterLogin(applyPath)
-                  navigate('/login')
-                }}
-                initialSearch={searchParams.search}
-                initialLocation={searchParams.location}
-              />
-            } />
-            <Route path="/companies" element={<Companies />} />
-            <Route path="/companies/:slug" element={<CompanyProfile />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </div>
-        <Footer />
-      </div>
-    )
-  }
-
-  const isEmployer = user?.role === 'employer'
-  const isCandidate = user?.role === 'candidate'
-  const isAdmin = user?.role === 'admin'
-  const canViewSavedSearch = isCandidate || (user == null && !!token)
-
-  return (
-    <div className="app-shell">
-      <Navbar activeTab={activeTab} onChange={(tab) => {
-        setActiveTab(tab)
-        const routeMap = {
-          'dashboard': '/',
-          'jobs': '/jobs',
-          'companies': '/companies',
-          'profile': '/profile',
-          'applications': '/applications',
-          'create-job': '/create-job',
-          'admin': adminRoute,
-          'settings': '/settings',
-          'saved-search': '/saved-search'
-        }
-        if (routeMap[tab]) navigate(routeMap[tab])
-      }} user={user} onLogout={logout} onAuth={() => navigate('/login')} isAuthenticated={true} token={token} />
-      <div className="app-content">
-        {loading && <div className="grid-card">Loading data...</div>}
-        {!loading && (
-          <Routes>
-            <Route path="/2fa/verify" element={<TwoFAVerify />} />
-            <Route path="/" element={
-              isCandidate ? (
-                <Dashboard jobs={jobs} applications={applications} candidate={candidateProfile} token={token} onSelectJob={handleSelectJob} />
-              ) : isEmployer ? (
-                <EmployerDashboard
-                  jobs={jobs}
-                  tenant={tenant}
-                  onSelectJob={handleSelectJob}
-                  onCreateJob={() => navigate('/create-job')}
-                  onEditJob={handleEditJob}
-                  onTogglePublish={handleTogglePublish}
-                  onSaveTenant={async (form) => {
-                    setSavingProfile(true)
-                    try {
-                      if (tenant?.id) {
-                        await api.updateTenant(tenant.id, form, token)
-                      } else {
-                        await api.createTenant(form, token)
-                      }
-                      await loadEmployerTenant(user.id, token)
-                    } catch (err) {
-                      console.error('Failed to save tenant', err)
-                      alert('Failed to save tenant')
-                    } finally {
-                      setSavingProfile(false)
+                onCreateJob={() => navigate(buildPath('create-job'))}
+                onEditJob={handleEditJob}
+                onTogglePublish={handleTogglePublish}
+                currentUser={effectiveUser}
+                onSaveTenant={async (form) => {
+                  setSavingProfile(true)
+                  try {
+                    if (tenant?.id) {
+                      await api.updateTenant(tenant.id, form, token)
+                    } else {
+                      await api.createTenant(form, token)
                     }
-                  }}
-                  savingTenant={savingProfile}
-                />
-              ) : <Navigate to="/" replace />
-            } />
-            <Route path="/companies" element={<Companies />} />
-            <Route path="/companies/:slug" element={<CompanyProfile />} />
-            <Route path="/jobs/:jobId" element={
-              <Jobs
-                jobs={jobs}
-                selectedJobId={null}
-                candidateId={candidateId}
-                token={token}
-                onSelectJob={handleSelectJob}
-                onApply={(job) => {
-                  const jobIdentifier = job.ad_number || job.id
-                  navigate(`/apply/${jobIdentifier}`)
+                    await loadEmployerTenant(user.id, token, tenant?.id || activeRole?.tenantId)
+                  } catch (err) {
+                    console.error('Failed to save tenant', err)
+                    alert('Failed to save tenant')
+                  } finally {
+                    setSavingProfile(false)
+                  }
                 }}
+                savingTenant={savingProfile}
               />
-            } />
-            <Route path="/jobs" element={
-              <Jobs
-                jobs={jobs}
-                selectedJobId={selectedJob?.id}
-                candidateId={candidateId}
-                token={token}
-                onSelectJob={handleSelectJob}
-                onApply={(job) => {
-                  const jobIdentifier = job.ad_number || job.id
-                  navigate(`/apply/${jobIdentifier}`)
-                }}
-              />
-            } />
-            <Route path="/apply" element={<ApplyJob token={token} candidateId={candidateId} candidate={candidate} user={user} tenant={tenant} />} />
-            <Route path="/apply/:jobId" element={<ApplyJob token={token} candidateId={candidateId} candidate={candidate} user={user} tenant={tenant} />} />
-            <Route path="/profile" element={
+            ) : <Navigate to={buildPath(adminRouteSlug)} replace />
+          } />
+
+          {/* Auth Routes */}
+          <Route path="/login" element={
+            <Auth mode="login" onToggleMode={() => navigate(buildPath('register'))} onLogin={handleLogin} onRegister={handleRegister} loading={authLoading} error={authError} />
+          } />
+          <Route path="/register" element={
+            <Auth mode="register" onToggleMode={() => navigate(buildPath('login'))} onLogin={handleLogin} onRegister={handleRegister} loading={authLoading} error={authError} />
+          } />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Public/Candidate Routes */}
+          <Route path="/jobs" element={
+            <Jobs
+              jobs={jobs}
+              selectedJobId={selectedJob?.id}
+              candidateId={candidateId}
+              token={token}
+              onSelectJob={handleSelectJob}
+              onApply={(jobId) => {
+                if (!token) {
+                  setRedirectAfterLogin(`/apply/${jobId}`)
+                  navigate(buildPath('login'))
+                } else {
+                  navigate(`/apply/${jobId}`)
+                }
+              }}
+              initialSearch={searchParams.search}
+              initialLocation={searchParams.location}
+            />
+          } />
+          <Route path="/jobs/:jobId" element={
+            <Jobs
+              jobs={jobs}
+              selectedJobId={null}
+              candidateId={candidateId}
+              token={token}
+              onSelectJob={handleSelectJob}
+              onApply={(jobId) => {
+                if (!token) {
+                  setRedirectAfterLogin(`/apply/${jobId}`)
+                  navigate(buildPath('login'))
+                } else {
+                  navigate(`/apply/${jobId}`)
+                }
+              }}
+            />
+          } />
+          <Route path="/companies" element={<Companies />} />
+          <Route path="/companies/:slug" element={<CompanyProfile />} />
+          <Route path="/apply" element={<ApplyJob token={token} candidateId={candidateId} candidate={candidate} user={user} tenant={tenant} />} />
+          <Route path="/apply/:jobId" element={<ApplyJob token={token} candidateId={candidateId} candidate={candidate} user={user} tenant={tenant} />} />
+
+          {/* Authenticated Candidate/Employer Private Routes */}
+          <Route path="/profile" element={
+            token ? (
               <div className="flex-1 flex items-start justify-center p-4 sm:p-6 lg:p-8">
                 <div className="w-full max-w-4xl">
                   <div className="grid gap-4">
@@ -792,57 +1105,62 @@ const AppContent = () => {
                   </div>
                 </div>
               </div>
-            } />
-            <Route path="/2fa/setup" element={<TwoFASetup token={token} user={user} onComplete={() => navigate('/profile')} />} />
-            <Route path="/applications" element={user?.role === 'candidate' ? <CandidateApplicationsPage /> : <JobSelectionList />} />
-            <Route path="/applications/job/:jobId/:applicantId?" element={<ApplicantReviewDashboard />} />
-            <Route path="/saved-search" element={
-              canViewSavedSearch ? (
-                <SavedSearch candidate={candidateProfile} candidateId={candidateId} token={token} onSelectJob={handleSelectJob} />
-              ) : <Navigate to="/" replace />
-            } />
-            <Route path="/saved-search/:categorySlug" element={
-              canViewSavedSearch ? (
-                <SavedSearch candidate={candidateProfile} candidateId={candidateId} token={token} onSelectJob={handleSelectJob} />
-              ) : <Navigate to="/" replace />
-            } />
-            <Route path="/create-job" element={
-              <JobForm
-                tenant={tenant}
-                onSubmit={handleCreateJob}
-                onCancel={() => navigate('/')}
-                saving={submitting}
-              />
-            } />
-            <Route path="/edit-job/:id" element={
-              <EditJobWrapper
-                tenant={tenant}
-                selectedJob={selectedJob}
-                jobs={jobs}
-                token={token}
-                user={user}
-                onLoadJobs={() => loadJobs({ role: user.role, token })}
-                onNavigate={navigate}
-              />
-            } />
-            <Route path="/tenant-members" element={<TenantMembers tenant={tenant} token={token} />} />
-            <Route path="/company/edit" element={<CompanyEdit />} />
-            <Route path="/settings" element={<Settings token={token} user={user} />} />
-            <Route path={adminRoute} element={
-              <AdminDashboard
-                tenants={tenants}
-                onRefresh={() => loadAllTenants(token)}
-                onSetStatus={async (id, status, rejectionReason) => {
-                  await api.updateTenantStatus(id, status, token, rejectionReason)
-                  await loadAllTenants(token)
-                }}
-              />
-            } />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        )}
+            ) : <Navigate to={buildPath('login')} />
+          } />
+          <Route path="/applications" element={token ? renderApplicationsElement() : <Navigate to={buildPath('login')} />} />
+          <Route path="/applications/job/:jobId/:applicantId?" element={<ApplicantReviewDashboard />} />
+          <Route path="/saved-search" element={canViewSavedSearch ? <SavedSearch candidate={candidateProfile} candidateId={candidateId} token={token} onSelectJob={handleSelectJob} /> : <Navigate to={buildPath('')} />} />
+          <Route path="/create-job" element={<JobForm tenant={tenant} currentUser={effectiveUser} onSubmit={handleCreateJob} onCancel={() => navigate(buildPath(''))} saving={submitting} />} />
+          <Route path="/edit-job/:id" element={<EditJobWrapper tenant={tenant} selectedJob={selectedJob} jobs={jobs} token={token} user={user} onLoadJobs={onLoadJobsCallback} onNavigate={navigate} />} />
+          <Route path="/tenant-members" element={<TenantMembers tenant={tenant} token={token} />} />
+          <Route path="/tenants/:id/permissions" element={<TenantPermissions />} />
+          <Route path="/settings" element={<Settings token={token} user={user} tenant={tenant} />} />
+
+          {/* Admin Routes */}
+          <Route path={`/${adminRouteSlug}`} element={
+            <AdminDashboardNew
+              tenants={tenants}
+              token={token}
+              onRefresh={() => loadAllTenants(token)}
+            />
+          } />
+          <Route path={`/${adminRouteSlug}/dashboard`} element={
+            <AdminDashboardNew
+              tenants={tenants}
+              token={token}
+              onRefresh={() => loadAllTenants(token)}
+            />
+          } />
+          <Route path={`/${adminRouteSlug}/tenants`} element={<TenantsManagementNew token={token} />} />
+          <Route path={`/${adminRouteSlug}/users`} element={<UsersDirectoryNew token={token} />} />
+          <Route path={`/${adminRouteSlug}/employers`} element={<EmployersManagementNew token={token} />} />
+          <Route path={`/${adminRouteSlug}/candidates`} element={<CandidatesManagementNew token={token} />} />
+          <Route path={`/${adminRouteSlug}/translations`} element={<TranslationPortalNew token={token} />} />
+          <Route path={`/${adminRouteSlug}/automation`} element={<AutomationSettingsNew token={token} />} />
+
+          <Route path="/privacy-policy" element={<PlatformLegal />} />
+          <Route path="*" element={<Navigate to={buildPath('')} replace />} />
+        </Routes>
       </div>
-      <Footer />
+
+      {!isAdminRoute && <Footer />}
+
+      {/* Blocking Terms Agreement Modal */}
+      {token && user && !user.agreed_to_terms && (user.terms_version_accepted !== termsVersion) && normalizedPath !== '/privacy-policy' && (
+        <TermsAgreementModal
+          onAgree={async () => {
+            const res = await api.agreeToTerms(token)
+            // Update local user state
+            setUser(prev => ({
+              ...prev,
+              agreed_to_terms: true,
+              terms_version_accepted: res.version || termsVersion
+            }))
+          }}
+        />
+      )}
+
+      <SiteNotice />
       {showSessionWarning && token && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-fade-in">
@@ -892,10 +1210,6 @@ const AppContent = () => {
   )
 }
 
-const App = () => (
-  <BrowserRouter>
-    <AppContent />
-  </BrowserRouter>
-)
+const App = () => <AppContent />
 
 export default App

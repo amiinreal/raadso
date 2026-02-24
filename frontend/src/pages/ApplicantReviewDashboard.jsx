@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 // Helper to construct full CDN URL for files
 const getCDNUrl = (fileUrl) => {
@@ -102,12 +103,12 @@ export function ApplicantReviewDashboard() {
         fetchJobAndApplications()
     }, [jobId, applicantId])
 
-    // Fetch messages every time selectedApp changes (user/applicant switch)
+    // Fetch messages every time selectedApp changes or when switching to the 'messages' tab
     useEffect(() => {
-        if (data.selectedApp && data.selectedApp.id) {
+        if (data.selectedApp && data.selectedApp.id && activeTab === 'messages') {
             fetchMessages(data.selectedApp.id)
         }
-    }, [data.selectedApp?.id])
+    }, [data.selectedApp?.id, activeTab])
 
     // Scroll to selected app in left panel when it's selected or restored
     useEffect(() => {
@@ -386,10 +387,7 @@ export function ApplicantReviewDashboard() {
     if (data.loading) {
         return (
             <div className="flex-1 flex items-center justify-center bg-background-light">
-                <div className="text-center">
-                    <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                    <p className="text-gray-600">Loading applications...</p>
-                </div>
+                <LoadingSpinner message="Loading applications..." />
             </div>
         )
     }
@@ -680,7 +678,19 @@ export function ApplicantReviewDashboard() {
                                                                         </p>
                                                                     </div>
                                                                 )}
-                                                                <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                                                                <p className="whitespace-pre-wrap text-sm">
+                                                                  {msg.content && typeof msg.content === 'string'
+                                                                    ? msg.content
+                                                                        .replace(/{first_name}/g, msg.first_name || '')
+                                                                        .replace(/{last_name}/g, msg.last_name || '')
+                                                                        .replace(/{full_name}/g, `${msg.first_name || ''} ${msg.last_name || ''}`.trim())
+                                                                        .replace(/{job_title}/g, msg.job_title || '')
+                                                                        .replace(/{company_name}/g, msg.company_name || '')
+                                                                        .replace(/{hiring_contact_name}/g, msg.hiring_contact_name || '')
+                                                                        .replace(/{hiring_contact_email}/g, msg.hiring_contact_email || '')
+                                                                    : msg.content
+                                                                  }
+                                                                </p>
                                                                 <p className={`text-xs mt-1 ${isEmployer ? 'text-blue-100' : 'text-gray-400'}`}>
                                                                     {new Date(msg.created_at).toLocaleString()}
                                                                 </p>

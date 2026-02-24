@@ -45,11 +45,17 @@ router.get('/:applicationId', authenticate, async (req, res) => {
         const messages = await query(
             `SELECT m.*, u.role, u.email,
                     cp.first_name, cp.last_name,
-                    t.company_name
+                    t.company_name,
+                    j.title as job_title,
+                    hc.name as hiring_contact_name,
+                    hc.email as hiring_contact_email
        FROM messages m
        JOIN users u ON m.sender_id = u.id
        LEFT JOIN candidate_profiles cp ON u.id = cp.user_id AND u.role = 'candidate'
        LEFT JOIN tenants t ON u.id = t.user_id AND u.role = 'employer'
+       LEFT JOIN applications a ON m.application_id = a.id
+       LEFT JOIN jobs j ON a.job_id = j.id
+       LEFT JOIN jsonb_to_recordset(j.hiring_contacts) AS hc(name text, email text) ON TRUE
        WHERE m.application_id = $1
        ORDER BY m.created_at ASC`,
             [applicationId]

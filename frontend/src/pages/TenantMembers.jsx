@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { jwtDecode } from 'jwt-decode'
+import { useNavigate } from 'react-router-dom'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function TenantMembers({ tenant, token }) {
   const [members, setMembers] = useState([])
@@ -10,10 +13,66 @@ export function TenantMembers({ tenant, token }) {
   const [newMemberRole, setNewMemberRole] = useState('member')
   const [inviting, setInviting] = useState(false)
   const [modal, setModal] = useState({ show: false, type: '', message: '' })
+  const [myPermissions, setMyPermissions] = useState({})
+  const [myRole, setMyRole] = useState('member')
+  const [myUserId, setMyUserId] = useState(null)
+  const navigate = useNavigate()
+  const canInviteMembers = myRole === 'owner' || Boolean(myPermissions?.can_invite_members ?? myPermissions?.can_invite)
+  const inviteRoleOptions = useMemo(() => {
+    const options = [{ value: 'member', label: 'Member' }]
+    if (myRole === 'owner' || myRole === 'manager') {
+      options.push({ value: 'manager', label: 'Manager' })
+    }
+    if (myRole === 'owner') {
+      options.push({ value: 'owner', label: 'Owner' })
+    }
+    return options
+  }, [myRole])
+
+  useEffect(() => {
+    if (!tenant?.id || !token) return
+
+    // Decode userId from token
+    let userId
+    try {
+      const decoded = jwtDecode(token)
+      userId = decoded.userId
+      setMyUserId(userId)
+    } catch (err) {
+      console.error('Failed to decode token', err)
+      return
+    }
+
+    // Check if user is the tenant creator (owner)
+    const isOwner = tenant.user_id === userId
+    if (isOwner) {
+      setMyRole('owner')
+      setMyPermissions({})
+      return
+    }
+
+    // Otherwise, fetch member info
+    fetch(`http://localhost:4000/tenant-members/${tenant.id}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then(res => res.json())
+      .then(data => {
+        const me = data.find(m => m.user_id === userId)
+        setMyPermissions(me?.permissions || {})
+        setMyRole(me?.role || 'member')
+      })
+      .catch(() => { })
+  }, [tenant?.id, tenant?.user_id, token])
 
   useEffect(() => {
     loadMembers()
   }, [tenant?.id, token])
+
+  useEffect(() => {
+    if (!inviteRoleOptions.some(option => option.value === newMemberRole)) {
+      setNewMemberRole(inviteRoleOptions[0]?.value || 'member')
+    }
+  }, [inviteRoleOptions, newMemberRole])
 
   const loadMembers = async () => {
     if (!tenant?.id) return
@@ -117,9 +176,20 @@ export function TenantMembers({ tenant, token }) {
       <div className="w-full max-w-4xl h-full overflow-y-auto custom-scrollbar">
         <div className="space-y-6">
           {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Team Members</h1>
-            <p className="text-gray-600 mt-2">{tenant?.company_name || 'Tenant'}</p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Team Members</h1>
+              <p className="text-gray-600 mt-2">{tenant?.company_name || 'Tenant'}</p>
+            </div>
+            {myRole === 'owner' && tenant?.id && (
+              <button
+                type="button"
+                onClick={() => navigate(`/tenants/${tenant.id}/permissions`)}
+                className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-sm hover:bg-indigo-700 transition-colors"
+              >
+                Manage Permissions
+              </button>
+            )}
           </div>
 
           {error && (
@@ -134,47 +204,48 @@ export function TenantMembers({ tenant, token }) {
             </div>
           )}
 
-          {/* Invite New Member Card */}
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Team Member</h2>
-
-            <form onSubmit={handleInviteMember} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                  <input
-                    type="email"
-                    value={newMemberEmail}
-                    onChange={(e) => setNewMemberEmail(e.target.value)}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="colleague@example.com"
-                  />
+          {/* Invite New Member Card (requires owner or invite permission) */}
+          {canInviteMembers && (
+            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Team Member</h2>
+              <form onSubmit={handleInviteMember} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="colleague@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    <select
+                      value={newMemberRole}
+                      onChange={(e) => setNewMemberRole(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {inviteRoleOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                  <select
-                    value={newMemberRole}
-                    onChange={(e) => setNewMemberRole(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="member">Member</option>
-                    <option value="manager">Manager</option>
-                    <option value="owner">Owner</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={inviting}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {inviting ? 'Sending Invitation...' : 'Send Invitation'}
-              </button>
-            </form>
-          </div>
+                <button
+                  type="submit"
+                  disabled={inviting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {inviting ? 'Sending Invitation...' : 'Send Invitation'}
+                </button>
+              </form>
+            </div>
+          )}
 
           {/* Active Members */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
@@ -184,8 +255,7 @@ export function TenantMembers({ tenant, token }) {
 
             {loading ? (
               <div className="p-6 text-center">
-                <div className="h-8 w-8 border-4 border-blue-300 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                <p className="text-gray-600 mt-2">Loading members...</p>
+                <LoadingSpinner fullScreen={false} size="md" message="Loading members..." />
               </div>
             ) : activeMembers.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
@@ -209,22 +279,47 @@ export function TenantMembers({ tenant, token }) {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <select
-                          value={member.role}
-                          onChange={(e) => handleUpdateRole(member.user_id, e.target.value)}
-                          className="px-3 py-1 border border-gray-300 rounded font-medium text-sm"
-                        >
-                          <option value="member">Member</option>
-                          <option value="manager">Manager</option>
-                          <option value="owner">Owner</option>
-                        </select>
+                        <div className="flex items-center gap-3">
+                          {/* Only owners and managers with permission can manage roles */}
+                          {(myRole === 'owner' || (myRole === 'manager' && myPermissions?.can_manage_team)) ? (
+                            <>
+                              {/* Prevent editing the owner's role */}
+                              {member.role === 'owner' ? (
+                                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-medium text-xs border border-purple-200">
+                                  Owner
+                                </span>
+                              ) : (
+                                <select
+                                  value={member.role}
+                                  onChange={(e) => handleUpdateRole(member.user_id, e.target.value)}
+                                  className="px-3 py-1 border border-gray-300 rounded font-medium text-sm"
+                                >
+                                  <option value="member">Member</option>
+                                  <option value="manager">Manager</option>
+                                  <option value="owner">Owner</option>
+                                </select>
+                              )}
 
-                        <button
-                          onClick={() => handleRemoveMember(member.user_id)}
-                          className="px-3 py-1 text-red-600 hover:bg-red-50 rounded font-medium text-sm transition-colors"
-                        >
-                          Remove
-                        </button>
+                              {/* Prevent removing the owner or self */}
+                              {member.role !== 'owner' && member.user_id !== myUserId && (
+                                <button
+                                  onClick={() => handleRemoveMember(member.user_id)}
+                                  className="px-3 py-1 text-red-600 hover:bg-red-50 rounded font-medium text-sm transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            // Read-only view for members
+                            <span className={`px-3 py-1 rounded-full font-medium text-xs border ${member.role === 'owner' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                member.role === 'manager' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                  'bg-gray-100 text-gray-700 border-gray-200'
+                              }`}>
+                              {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -245,7 +340,7 @@ export function TenantMembers({ tenant, token }) {
                   <div key={member.id} className="p-6 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold text-gray-900">{member.email}</p>
+                        <p className="font-semibold text-gray-900">{member.invited_email || member.email}</p>
                         <p className="text-xs text-gray-500 mt-1">
                           Invited {new Date(member.invited_at).toLocaleDateString()}
                         </p>

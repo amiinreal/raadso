@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function JobSelectionList() {
     const navigate = useNavigate()
@@ -27,12 +28,7 @@ export function JobSelectionList() {
     if (data.loading) {
         return (
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 bg-background-light">
-                <div className="flex items-center justify-center py-16">
-                    <div className="text-center">
-                        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                        <p className="text-gray-600">Loading your jobs...</p>
-                    </div>
-                </div>
+                <LoadingSpinner message="Loading your jobs..." />
             </div>
         )
     }

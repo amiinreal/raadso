@@ -11,9 +11,15 @@ SET device_label = COALESCE(device_label, 'Unknown'),
     trusted_at = COALESCE(trusted_at, NOW())
 WHERE device_label IS NULL OR trusted_at IS NULL;
 
--- Ensure fingerprint constraint remains
-ALTER TABLE two_fa_sessions
-  ADD CONSTRAINT IF NOT EXISTS unique_user_device_fingerprint UNIQUE (user_id, device_fingerprint);
+-- Ensure fingerprint constraint remains (idempotent)
+DO $$
+BEGIN
+  ALTER TABLE two_fa_sessions
+    ADD CONSTRAINT unique_user_device_fingerprint UNIQUE (user_id, device_fingerprint);
+EXCEPTION
+  WHEN duplicate_object THEN
+    RAISE NOTICE 'unique_user_device_fingerprint already exists, skipping';
+END $$;
 
 -- Helpful indexes
 CREATE INDEX IF NOT EXISTS idx_two_fa_sessions_expires ON two_fa_sessions(expires_at);

@@ -1,17 +1,32 @@
 import { useState, useEffect } from 'react'
 import { TwoFASetup } from './TwoFASetup'
+import { AuditLogs } from '../components/AuditLogs'
 import { api } from '../api/api'
 
-export function Settings({ token, user }) {
+export function Settings({ token, user, tenant }) {
   const [activeSection, setActiveSection] = useState('account')
   const [twoFAEnabled, setTwoFAEnabled] = useState(false)
   const [showTwoFASetup, setShowTwoFASetup] = useState(false)
   const [loading, setLoading] = useState(false)
+  
+  // Check if user is the tenant owner (only owners can see audit logs)
+  const isOwner = user?.role === 'employer' && tenant?.user_id === user?.id
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [trustedDevices, setTrustedDevices] = useState([])
   const [loadingTrusted, setLoadingTrusted] = useState(false)
+
   const [revokingId, setRevokingId] = useState(null)
+
+  // Password Change State
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otp, setOtp] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [passwordLoading, setPasswordLoading] = useState(false)
 
   useEffect(() => {
     if (token) {
@@ -132,24 +147,33 @@ export function Settings({ token, user }) {
           <div className="border-b border-gray-200 flex space-x-8">
             <button
               onClick={() => setActiveSection('account')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeSection === 'account'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeSection === 'account'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                }`}
             >
               Account
             </button>
             <button
               onClick={() => setActiveSection('security')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeSection === 'security'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeSection === 'security'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                }`}
             >
               Security
             </button>
+            {isOwner && (
+              <button
+                onClick={() => setActiveSection('audit')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeSection === 'audit'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                  }`}
+              >
+                Audit Logs
+              </button>
+            )}
           </div>
 
           {/* Account Section */}
@@ -213,11 +237,10 @@ export function Settings({ token, user }) {
                       Add an extra layer of security to your account with 2FA via email
                     </p>
                   </div>
-                  <div className={`px-3 py-1 rounded-full font-semibold text-xs ${
-                    twoFAEnabled
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}>
+                  <div className={`px-3 py-1 rounded-full font-semibold text-xs ${twoFAEnabled
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-700'
+                    }`}>
                     {twoFAEnabled ? 'Enabled' : 'Disabled'}
                   </div>
                 </div>
@@ -300,12 +323,147 @@ export function Settings({ token, user }) {
               {/* Password Card */}
               <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Password</h2>
-                <p className="text-sm text-gray-600 mb-4">Change your password regularly to keep your account secure</p>
-                <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors">
-                  Change Password
-                </button>
+                <p className="text-sm text-gray-600 mb-4">You must verify your identity with a code sent to your email to change your password.</p>
+
+                {!showPasswordChange ? (
+                  <button
+                    onClick={() => setShowPasswordChange(true)}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                  >
+                    Change Password
+                  </button>
+                ) : (
+                  <div className="space-y-4 max-w-md">
+                    {/* Error/Success Messages */}
+                    {passwordError && (
+                      <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">{passwordError}</div>
+                    )}
+                    {passwordSuccess && (
+                      <div className="p-3 bg-green-50 text-green-700 text-sm rounded-lg">{passwordSuccess}</div>
+                    )}
+
+                    {!otpSent ? (
+                      <div>
+                        <button
+                          onClick={async () => {
+                            setPasswordLoading(true)
+                            setPasswordError('')
+                            try {
+                              await api.sendOtp(token)
+                              setOtpSent(true)
+                              setPasswordSuccess('Verification code sent to your email.')
+                            } catch (err) {
+                              setPasswordError(err.message || 'Failed to send verification code')
+                            } finally {
+                              setPasswordLoading(false)
+                            }
+                          }}
+                          disabled={passwordLoading}
+                          className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary-hover disabled:opacity-50"
+                        >
+                          {passwordLoading ? 'Sending Code...' : 'Send Verification Code'}
+                        </button>
+                        <button
+                          onClick={() => setShowPasswordChange(false)}
+                          className="ml-3 px-4 py-2 text-gray-600 hover:text-gray-900"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Verification Code</label>
+                          <input
+                            type="text"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value)}
+                            placeholder="6-digit code"
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">New Password</label>
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
+                          <input
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                          />
+                        </div>
+
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={async () => {
+                              if (newPassword !== confirmPassword) {
+                                setPasswordError('Passwords do not match')
+                                return
+                              }
+                              if (!otp || !newPassword) {
+                                setPasswordError('Please fill in all fields')
+                                return
+                              }
+
+                              setPasswordLoading(true)
+                              setPasswordError('')
+                              try {
+                                await api.changePassword(otp, newPassword, token)
+                                setPasswordSuccess('Password changed successfully')
+                                setOtp('')
+                                setNewPassword('')
+                                setConfirmPassword('')
+                                setTimeout(() => {
+                                  setShowPasswordChange(false)
+                                  setOtpSent(false)
+                                  setPasswordSuccess('')
+                                }, 2000)
+                              } catch (err) {
+                                setPasswordError(err.message || 'Failed to change password')
+                              } finally {
+                                setPasswordLoading(false)
+                              }
+                            }}
+                            disabled={passwordLoading}
+                            className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary-hover disabled:opacity-50"
+                          >
+                            {passwordLoading ? 'Updating...' : 'Update Password'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowPasswordChange(false)
+                              setOtpSent(false)
+                              setPasswordError('')
+                              setPasswordSuccess('')
+                            }}
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
+          )}
+
+          {/* Audit Logs Section */}
+          {activeSection === 'audit' && isOwner && (
+            <AuditLogs 
+              token={token} 
+              tenantId={tenant?.id} 
+              user={user}
+            />
           )}
         </div>
       </div>

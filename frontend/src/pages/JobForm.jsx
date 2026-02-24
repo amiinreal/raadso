@@ -1,21 +1,88 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/api.js'
-import { 
-  isValidLength, 
-  isValidInteger, 
-  isValidDate, 
-  isValidEmail, 
+import { jwtDecode } from 'jwt-decode'
+import {
+  isValidLength,
+  isValidInteger,
+  isValidDate,
+  isValidEmail,
   sanitizeInput,
   EMPLOYMENT_TYPES,
   WORKPLACE_TYPES,
-  CURRENCIES 
+  CURRENCIES
 } from '../utils/validation.js'
 
-export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob = null }) {
+export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob = null, currentUser = null }) {
   const isEdit = !!initialJob
+  const [tenantData, setTenantData] = useState(tenant)
+
+  // If tenant not provided or missing members, fetch it
+  useEffect(() => {
+    if (!tenant?.members && tenant?.id) {
+      // Tenant was passed but doesn't have members yet - refresh it
+      const token = localStorage.getItem('job-platform-token')
+      if (token) {
+        api.getTenant(tenant.id, token)
+          .then(freshTenant => setTenantData(freshTenant))
+          .catch(err => console.error('Failed to refresh tenant:', err))
+      }
+    } else if (tenant?.members) {
+      // Tenant has members - use it
+      setTenantData(tenant)
+    }
+  }, [tenant])
+
+  // Get userId from token or currentUser
+  let myUserId = currentUser?.id
+  if (!myUserId) {
+    const token = localStorage.getItem('job-platform-token')
+    if (token) {
+      try {
+        const decoded = jwtDecode(token)
+        myUserId = decoded.userId
+      } catch (err) {
+        console.error('Failed to decode token', err)
+      }
+    }
+  }
+
+  // Check if user is owner via members array OR tenant creator
+  const myMember = tenantData?.members?.find(m => m.user_id === myUserId) || null
+  const isOwner = (myMember?.role === 'owner') || (tenantData?.user_id === myUserId)
+  const isManager = myMember?.role === 'manager' || isOwner
   
+  // Check if member has explicit can_post_job permission
+  const memberPermissions = myMember?.permissions
+  const parsedPermissions = typeof memberPermissions === 'string' ? 
+    (() => { try { return JSON.parse(memberPermissions) } catch { return {} } })() : 
+    (memberPermissions || {})
+  const hasPostJobPermission = parsedPermissions.can_post_job || isManager
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('JobForm Debug - Full Members List:', tenantData?.members)
+    console.log('JobForm Debug - Looking for myUserId:', myUserId)
+    console.log('JobForm Debug - Members user_ids:', tenantData?.members?.map(m => ({ id: m.user_id, role: m.role, email: m.email })))
+    console.log('JobForm Debug:', {
+      currentUser,
+      myUserId,
+      tenantId: tenantData?.id,
+      tenantUserId: tenantData?.user_id,
+      tenantUserIdMatches: tenantData?.user_id === myUserId,
+      membersArray: tenantData?.members,
+      myMember,
+      isOwner,
+      isManager,
+      memberPermissions,
+      parsedPermissions,
+      hasPostJobPermission
+    })
+  }, [tenantData, myUserId, currentUser])
+  
+  const myRole = isOwner ? 'owner' : (myMember?.role || currentUser?.role || 'member')
+
   const [validationErrors, setValidationErrors] = useState({})
-  
+
   const [form, setForm] = useState({
     title: '',
     location: '',
@@ -43,7 +110,16 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
     requireLanguages: [],
     requireNationality: '',
     customFileRequirements: [],
-    active: true
+    autoReplyEnabled: false,
+    autoReplySubject: '',
+    autoReplyMessage: '',
+    hiringContactName: '',
+    hiringContactEmail: '',
+    rejectionSubject: '',
+    rejectionMessage: '',
+    active: false,
+    allowMessaging: true,
+    allowReplies: true
   })
 
   const [categories, setCategories] = useState([])
@@ -94,10 +170,23 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
         requireCv: initialJob.require_cv || false,
         requireExperience: initialJob.require_experience || false,
         requireEducation: initialJob.require_education || false,
-        requireLanguages: initialJob.require_languages || [],
+        requireLanguages: Array.isArray(initialJob.require_languages) 
+          ? initialJob.require_languages 
+          : (typeof initialJob.require_languages === 'string' 
+            ? (() => { try { return JSON.parse(initialJob.require_languages) } catch { return [] } })() 
+            : []),
         requireNationality: initialJob.require_nationality || '',
         customFileRequirements: initialJob.custom_file_requirements || [],
-        active: initialJob.active !== false
+        autoReplyEnabled: initialJob.auto_reply_enabled || false,
+        autoReplySubject: initialJob.auto_reply_subject || '',
+        autoReplyMessage: initialJob.auto_reply_message || '',
+        hiringContactName: initialJob.hiring_contact_name || '',
+        hiringContactEmail: initialJob.hiring_contact_email || '',
+        rejectionSubject: initialJob.rejection_subject || '',
+        rejectionMessage: initialJob.rejection_message || '',
+        active: initialJob.active || false,
+        allowMessaging: initialJob.allow_messaging !== false,
+        allowReplies: initialJob.allow_replies !== false
       })
     } else if (tenant?.description) {
       // Pre-fill aboutCompany with tenant description for new jobs
@@ -142,24 +231,24 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
     if (!search) return true
     const searchLower = search.toLowerCase().trim()
     const textLower = text.toLowerCase()
-    
+
     // Split search into words and check if all words are found as separate words or at boundaries
     const searchWords = searchLower.split(/\s+/)
     return searchWords.every(word => {
       // Match whole words or at word boundaries (start of string, after space, after &)
-      const wordBoundaryRegex = new RegExp(`(^|\\s|&)${word}`, 'i')
+      const wordBoundaryRegex = new RegExp(`(^|\\s |&)${word} `, 'i')
       return wordBoundaryRegex.test(text)
     })
   }
 
   const filteredParentCategories = categorySearch
     ? parentCategories.filter(p => {
-        const matchesParent = matchesSearch(p.name, categorySearch)
-        const hasMatchingChild = categories.some(c => 
-          c.parent_id === p.id && matchesSearch(c.name, categorySearch)
-        )
-        return matchesParent || hasMatchingChild
-      })
+      const matchesParent = matchesSearch(p.name, categorySearch)
+      const hasMatchingChild = categories.some(c =>
+        c.parent_id === p.id && matchesSearch(c.name, categorySearch)
+      )
+      return matchesParent || hasMatchingChild
+    })
     : parentCategories
 
   const getFilteredChildren = (parentId) => {
@@ -170,23 +259,23 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
 
   const handleAddCustomCategory = async () => {
     if (!newCategoryName.trim()) return
-    
+
     try {
       const response = await api.createJobCategory({
         name: newCategoryName,
         parentId: newCategoryParent || null
       })
-      
+
       // Add to local state
       const newCat = response
       setCategories(prev => [...prev, newCat])
       if (!newCat.parent_id) {
         setParentCategories(prev => [...prev, newCat])
       }
-      
+
       // Auto-select the new category
       setForm(prev => ({ ...prev, categoryIds: [...prev.categoryIds, newCat.id] }))
-      
+
       // Reset form
       setNewCategoryName('')
       setNewCategoryParent('')
@@ -199,7 +288,7 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
-    
+
     if (type === 'checkbox') {
       // Handle special cases for arrays
       if (name === 'requireLanguages') {
@@ -255,17 +344,17 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
 
   const validateFields = () => {
     const errors = {}
-    
+
     // Title validation
     if (!isValidLength(form.title, 3, 200)) {
       errors.title = 'Title must be 3-200 characters'
     }
-    
+
     // Location validation
     if (!isValidLength(form.location, 2, 200)) {
       errors.location = 'Location must be 2-200 characters'
     }
-    
+
     // Description validations
     if (form.aboutRole && form.aboutRole.length > 5000) {
       errors.aboutRole = 'About role must be under 5000 characters'
@@ -273,7 +362,7 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
     if (form.aboutCompany && form.aboutCompany.length > 5000) {
       errors.aboutCompany = 'About company must be under 5000 characters'
     }
-    
+
     // Salary validations
     if (form.salaryMin && !isValidInteger(form.salaryMin, 0)) {
       errors.salaryMin = 'Minimum salary must be a positive number'
@@ -284,12 +373,12 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
     if (form.salaryMin && form.salaryMax && parseInt(form.salaryMin) > parseInt(form.salaryMax)) {
       errors.salaryMax = 'Maximum salary must be greater than minimum'
     }
-    
+
     // Deadline validation
     if (form.applicationDeadline && !isValidDate(form.applicationDeadline)) {
       errors.applicationDeadline = 'Invalid deadline date'
     }
-    
+
     // Array length validations
     if (form.keyResponsibilities.length > 50) {
       errors.keyResponsibilities = 'Maximum 50 responsibilities allowed'
@@ -306,26 +395,33 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
     if (form.tags.length > 50) {
       errors.tags = 'Maximum 50 tags allowed'
     }
-    
+
     // Contact email validation
     form.hiringContacts.forEach((contact, index) => {
       if (!isValidEmail(contact.email)) {
-        errors[`contact_${index}`] = `Contact ${index + 1}: Invalid email address`
+        errors[`contact_${index} `] = `Contact ${index + 1}: Invalid email address`
       }
     })
-    
+
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+    // Check if user has permission to post jobs
+    if (!hasPostJobPermission) {
+      alert('Only managers or users with posting permissions can post jobs.')
+      return
+    }
+    // The backend will validate tenant membership and permissions
     if (!validateFields()) {
       return
     }
-    
-    if (form.active && !isEdit) {
+    // Confirm if publishing a new job OR publishing a draft
+    const isPublishing = form.active && (!initialJob || !initialJob.active)
+
+    if (isPublishing) {
       setShowConfirmDialog(true)
     } else {
       submitForm()
@@ -334,7 +430,7 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
 
   const submitForm = () => {
     const payload = {
-      tenantId: tenant?.id,
+      tenantId: (tenantData || tenant)?.id,
       title: sanitizeInput(form.title),
       location: sanitizeInput(form.location),
       employmentType: form.employmentType,
@@ -363,14 +459,34 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
       requireCv: form.requireCv,
       requireExperience: form.requireExperience,
       requireEducation: form.requireEducation,
-      requireLanguages: form.requireLanguages,
+      requireLanguages: Array.isArray(form.requireLanguages) ? form.requireLanguages : [],
       requireNationality: form.requireNationality,
-      customFileRequirements: form.customFileRequirements
+      customFileRequirements: form.customFileRequirements,
+      autoReplyEnabled: form.autoReplyEnabled,
+      autoReplySubject: sanitizeInput(form.autoReplySubject),
+      autoReplyMessage: sanitizeInput(form.autoReplyMessage),
+      hiringContactName: sanitizeInput(form.hiringContactName),
+      hiringContactEmail: sanitizeInput(form.hiringContactEmail),
+      rejectionSubject: sanitizeInput(form.rejectionSubject),
+      rejectionMessage: sanitizeInput(form.rejectionMessage),
+      allowMessaging: form.allowMessaging,
+      allowReplies: form.allowReplies
     }
     setShowConfirmDialog(false)
     onSubmit(payload)
   }
 
+  if (!hasPostJobPermission) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Restricted</h2>
+          <p className="text-gray-700 mb-2">Only managers can post jobs.</p>
+          <p className="text-gray-500">Contact your team manager or owner to request posting access.</p>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 bg-background-light">
       <div className="max-w-4xl mx-auto">
@@ -396,62 +512,87 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   </svg>
                   Basic Information
                 </h3>
-                <div className="grid md:grid-cols-2 gap-5">
+                <div className="grid md:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Job Title *</label>
-                    <input 
-                      name="title" 
-                      value={form.title} 
-                      onChange={(e) => {
-                        handleChange(e)
-                        if (validationErrors.title) {
-                          setValidationErrors(prev => ({ ...prev, title: undefined }))
-                        }
-                      }}
-                      className={`w-full px-4 py-3 rounded-lg border ${validationErrors.title ? 'border-red-500' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm`}
-                      placeholder="e.g. Senior Frontend Developer" 
-                      maxLength={200}
-                      required 
-                    />
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Job Title <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <input
+                        name="title"
+                        value={form.title}
+                        onChange={(e) => {
+                          handleChange(e)
+                          if (validationErrors.title) {
+                            setValidationErrors(prev => ({ ...prev, title: undefined }))
+                          }
+                        }}
+                        className={`w-full pl-10 pr-4 py-3 rounded-xl border ${validationErrors.title ? 'border-red-500 ring-4 ring-red-50' : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'} bg-white text-gray-900 shadow-sm outline-none transition-all placeholder-gray-400 sm:text-sm font-medium`}
+                        placeholder="e.g. Senior Frontend Developer"
+                        maxLength={200}
+                        required
+                      />
+                    </div>
                     {validationErrors.title && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.title}</p>
+                      <p className="mt-1 text-sm text-red-600 bg-red-50 p-2 rounded-lg flex items-center gap-2">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                        {validationErrors.title}
+                      </p>
                     )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Location</label>
-                    <input 
-                      name="location" 
-                      value={form.location}
-                      onChange={(e) => {
-                        handleChange(e)
-                        if (validationErrors.location) {
-                          setValidationErrors(prev => ({ ...prev, location: undefined }))
-                        }
-                      }}
-                      className={`w-full px-4 py-3 rounded-lg border ${validationErrors.location ? 'border-red-500' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm`}
-                      placeholder="e.g. New York, NY or Remote"
-                      maxLength={200}
-                    />
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <input
+                        name="location"
+                        value={form.location}
+                        onChange={(e) => {
+                          handleChange(e)
+                          if (validationErrors.location) {
+                            setValidationErrors(prev => ({ ...prev, location: undefined }))
+                          }
+                        }}
+                        className={`w-full pl-10 pr-4 py-3 rounded-xl border ${validationErrors.location ? 'border-red-500 ring-4 ring-red-50' : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'} bg-white text-gray-900 shadow-sm outline-none transition-all placeholder-gray-400 sm:text-sm font-medium`}
+                        placeholder="e.g. New York, NY or Remote"
+                        maxLength={200}
+                      />
+                    </div>
                     {validationErrors.location && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.location}</p>
+                      <p className="mt-1 text-sm text-red-600 bg-red-50 p-2 rounded-lg">{validationErrors.location}</p>
                     )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Application Deadline</label>
-                    <input 
-                      type="date" 
-                      name="applicationDeadline"
-                      value={form.applicationDeadline}
-                      onChange={(e) => {
-                        handleChange(e)
-                        if (validationErrors.applicationDeadline) {
-                          setValidationErrors(prev => ({ ...prev, applicationDeadline: undefined }))
-                        }
-                      }}
-                      className={`w-full px-4 py-3 rounded-lg border ${validationErrors.applicationDeadline ? 'border-red-500' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm`}
-                    />
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <input
+                        type="date"
+                        name="applicationDeadline"
+                        value={form.applicationDeadline}
+                        onChange={(e) => {
+                          handleChange(e)
+                          if (validationErrors.applicationDeadline) {
+                            setValidationErrors(prev => ({ ...prev, applicationDeadline: undefined }))
+                          }
+                        }}
+                        className={`w-full pl-10 pr-4 py-3 rounded-xl border ${validationErrors.applicationDeadline ? 'border-red-500 ring-4 ring-red-50' : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'} bg-white text-gray-900 shadow-sm outline-none transition-all placeholder-gray-400 sm:text-sm font-medium`}
+                      />
+                    </div>
                     {validationErrors.applicationDeadline && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.applicationDeadline}</p>
+                      <p className="mt-1 text-sm text-red-600 bg-red-50 p-2 rounded-lg">{validationErrors.applicationDeadline}</p>
                     )}
                   </div>
                 </div>
@@ -469,7 +610,7 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Select Categories (Multiple) *</label>
                     <p className="text-xs text-gray-600 mb-3">Select one or more categories that best describe this job</p>
-                    
+
                     {/* Search and Add Category */}
                     <div className="flex gap-2 mb-3">
                       <input
@@ -536,7 +677,7 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto custom-scrollbar p-4 border border-gray-200 rounded-lg bg-gray-50">
                       {filteredParentCategories.length === 0 && categorySearch && (
                         <div className="text-center py-8 text-gray-500 text-sm">
@@ -608,10 +749,10 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                 <div className="grid md:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Employment Type</label>
-                    <select 
-                      name="employmentType" 
-                      value={form.employmentType} 
-                      onChange={handleChange} 
+                    <select
+                      name="employmentType"
+                      value={form.employmentType}
+                      onChange={handleChange}
                       className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all sm:text-sm"
                     >
                       <option>Full-time</option>
@@ -623,10 +764,10 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Workplace Type</label>
-                    <select 
-                      name="workplaceType" 
-                      value={form.workplaceType} 
-                      onChange={handleChange} 
+                    <select
+                      name="workplaceType"
+                      value={form.workplaceType}
+                      onChange={handleChange}
                       className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all sm:text-sm"
                     >
                       <option>On-site</option>
@@ -636,10 +777,10 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Seniority Level</label>
-                    <select 
-                      name="seniorityLevel" 
-                      value={form.seniorityLevel} 
-                      onChange={handleChange} 
+                    <select
+                      name="seniorityLevel"
+                      value={form.seniorityLevel}
+                      onChange={handleChange}
                       className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all sm:text-sm"
                     >
                       <option>Internship</option>
@@ -661,11 +802,14 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   </svg>
                   Job Description
                 </h3>
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">About the Role</label>
-                    <textarea 
-                      name="aboutRole" 
+                <div className="space-y-6">
+                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                    <label className="block text-sm font-semibold text-gray-900 mb-3 flex justify-between">
+                      About the Role
+                      <span className="text-xs font-normal text-gray-500">{form.aboutRole.length}/5000</span>
+                    </label>
+                    <textarea
+                      name="aboutRole"
                       value={form.aboutRole}
                       onChange={(e) => {
                         handleChange(e)
@@ -673,19 +817,22 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                           setValidationErrors(prev => ({ ...prev, aboutRole: undefined }))
                         }
                       }}
-                      className={`w-full px-4 py-3 rounded-lg border ${validationErrors.aboutRole ? 'border-red-500' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm`}
-                      placeholder="Describe the role and what the candidate will be doing..." 
-                      rows={4}
+                      className={`w-full px-4 py-3 rounded-xl border ${validationErrors.aboutRole ? 'border-red-500' : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'} bg-white text-gray-900 shadow-sm outline-none transition-all placeholder-gray-400 sm:text-sm leading-relaxed`}
+                      placeholder="Describe the role responsibilities, team culture, and what a typical day looks like..."
+                      rows={6}
                       maxLength={5000}
                     />
                     {validationErrors.aboutRole && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.aboutRole}</p>
                     )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">About the Company</label>
-                    <textarea 
-                      name="aboutCompany" 
+                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                    <label className="block text-sm font-semibold text-gray-900 mb-3 flex justify-between">
+                      About the Company
+                      <span className="text-xs font-normal text-gray-500">{form.aboutCompany.length}/5000</span>
+                    </label>
+                    <textarea
+                      name="aboutCompany"
                       value={form.aboutCompany}
                       onChange={(e) => {
                         handleChange(e)
@@ -693,9 +840,9 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                           setValidationErrors(prev => ({ ...prev, aboutCompany: undefined }))
                         }
                       }}
-                      className={`w-full px-4 py-3 rounded-lg border ${validationErrors.aboutCompany ? 'border-red-500' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm`}
-                      placeholder="Tell candidates about your company..." 
-                      rows={3}
+                      className={`w-full px-4 py-3 rounded-xl border ${validationErrors.aboutCompany ? 'border-red-500' : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'} bg-white text-gray-900 shadow-sm outline-none transition-all placeholder-gray-400 sm:text-sm leading-relaxed`}
+                      placeholder="Share your company mission, values, and why it's a great place to work..."
+                      rows={4}
                       maxLength={5000}
                     />
                     {validationErrors.aboutCompany && (
@@ -715,15 +862,15 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                 </h3>
                 <div>
                   <div className="flex gap-2 mb-3">
-                    <input 
-                      value={responsibilityInput} 
+                    <input
+                      value={responsibilityInput}
                       onChange={(e) => setResponsibilityInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem(responsibilityInput, setResponsibilityInput, 'keyResponsibilities'))}
-                      className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                      placeholder="Add a responsibility (press Enter)" 
+                      className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="Add a responsibility (press Enter)"
                     />
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => addItem(responsibilityInput, setResponsibilityInput, 'keyResponsibilities')}
                       className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition-all"
                     >
@@ -757,15 +904,15 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Required Skills</label>
                     <div className="flex gap-2 mb-3">
-                      <input 
-                        value={requiredSkillInput} 
+                      <input
+                        value={requiredSkillInput}
                         onChange={(e) => setRequiredSkillInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem(requiredSkillInput, setRequiredSkillInput, 'requiredSkills'))}
-                        className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                        placeholder="Add a required skill" 
+                        className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                        placeholder="Add a required skill"
                       />
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => addItem(requiredSkillInput, setRequiredSkillInput, 'requiredSkills')}
                         className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition-all"
                       >
@@ -788,15 +935,15 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Preferred Skills (Optional)</label>
                     <div className="flex gap-2 mb-3">
-                      <input 
-                        value={preferredSkillInput} 
+                      <input
+                        value={preferredSkillInput}
                         onChange={(e) => setPreferredSkillInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem(preferredSkillInput, setPreferredSkillInput, 'preferredSkills'))}
-                        className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                        placeholder="Add a preferred skill" 
+                        className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                        placeholder="Add a preferred skill"
                       />
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => addItem(preferredSkillInput, setPreferredSkillInput, 'preferredSkills')}
                         className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition-all"
                       >
@@ -824,46 +971,46 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                 const cat = categories.find(c => c.id === catId)
                 return cat?.parent_id === (parentCategories.find(p => p.name === 'Technology & IT')?.id || '')
               }) && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                    </svg>
-                    Tech Stack
-                  </h3>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Technologies & Tools</label>
-                    <div className="flex gap-2 mb-3">
-                      <input 
-                        value={techStackInput} 
-                        onChange={(e) => setTechStackInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem(techStackInput, setTechStackInput, 'techStack'))}
-                        className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                        placeholder="e.g. React, Node.js, PostgreSQL" 
-                      />
-                      <button 
-                        type="button" 
-                        onClick={() => addItem(techStackInput, setTechStackInput, 'techStack')}
-                        className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition-all"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {form.techStack.map((item, i) => (
-                        <span key={i} className="px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm flex items-center gap-2 border border-purple-100">
-                          {item}
-                          <button type="button" onClick={() => removeItem('techStack', i)} className="text-purple-600 hover:text-purple-800">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </span>
-                      ))}
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                      </svg>
+                      Tech Stack
+                    </h3>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">Technologies & Tools</label>
+                      <div className="flex gap-2 mb-3">
+                        <input
+                          value={techStackInput}
+                          onChange={(e) => setTechStackInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem(techStackInput, setTechStackInput, 'techStack'))}
+                          className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                          placeholder="e.g. React, Node.js, PostgreSQL"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addItem(techStackInput, setTechStackInput, 'techStack')}
+                          className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition-all"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {form.techStack.map((item, i) => (
+                          <span key={i} className="px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm flex items-center gap-2 border border-purple-100">
+                            {item}
+                            <button type="button" onClick={() => removeItem('techStack', i)} className="text-purple-600 hover:text-purple-800">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Compensation */}
               <div>
@@ -873,54 +1020,60 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   </svg>
                   Compensation (Optional)
                 </h3>
-                <div className="grid md:grid-cols-3 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Minimum Salary (Optional)</label>
-                    <input 
-                      type="number" 
-                      name="salaryMin" 
-                      value={form.salaryMin}
-                      onChange={(e) => {
-                        handleChange(e)
-                        if (validationErrors.salaryMin) {
-                          setValidationErrors(prev => ({ ...prev, salaryMin: undefined }))
-                        }
-                      }}
-                      className={`w-full px-4 py-3 rounded-lg border ${validationErrors.salaryMin ? 'border-red-500' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm`}
-                      placeholder="50000"
-                      min="0"
-                    />
+                <div className="grid md:grid-cols-3 gap-6 bg-gray-50/50 p-6 rounded-xl border border-gray-100">
+                  <div className="md:col-span-1 relative">
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Minimum Salary</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-medium">$</span>
+                      <input
+                        type="number"
+                        name="salaryMin"
+                        value={form.salaryMin}
+                        onChange={(e) => {
+                          handleChange(e)
+                          if (validationErrors.salaryMin) {
+                            setValidationErrors(prev => ({ ...prev, salaryMin: undefined }))
+                          }
+                        }}
+                        className={`w-full pl-8 pr-4 py-3 rounded-xl border ${validationErrors.salaryMin ? 'border-red-500' : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'} bg-white text-gray-900 shadow-sm outline-none transition-all placeholder-gray-400 sm:text-sm font-medium`}
+                        placeholder="e.g. 50000"
+                        min="0"
+                      />
+                    </div>
                     {validationErrors.salaryMin && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.salaryMin}</p>
                     )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">Maximum Salary (Optional)</label>
-                    <input 
-                      type="number" 
-                      name="salaryMax" 
-                      value={form.salaryMax}
-                      onChange={(e) => {
-                        handleChange(e)
-                        if (validationErrors.salaryMax) {
-                          setValidationErrors(prev => ({ ...prev, salaryMax: undefined }))
-                        }
-                      }}
-                      className={`w-full px-4 py-3 rounded-lg border ${validationErrors.salaryMax ? 'border-red-500' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm`}
-                      placeholder="80000"
-                      min="0"
-                    />
+                  <div className="md:col-span-1 relative">
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Maximum Salary</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-medium">$</span>
+                      <input
+                        type="number"
+                        name="salaryMax"
+                        value={form.salaryMax}
+                        onChange={(e) => {
+                          handleChange(e)
+                          if (validationErrors.salaryMax) {
+                            setValidationErrors(prev => ({ ...prev, salaryMax: undefined }))
+                          }
+                        }}
+                        className={`w-full pl-8 pr-4 py-3 rounded-xl border ${validationErrors.salaryMax ? 'border-red-500' : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'} bg-white text-gray-900 shadow-sm outline-none transition-all placeholder-gray-400 sm:text-sm font-medium`}
+                        placeholder="e.g. 80000"
+                        min="0"
+                      />
+                    </div>
                     {validationErrors.salaryMax && (
                       <p className="mt-1 text-sm text-red-600">{validationErrors.salaryMax}</p>
                     )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-2">Currency</label>
-                    <select 
-                      name="currency" 
-                      value={form.currency} 
-                      onChange={handleChange} 
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all sm:text-sm"
+                    <select
+                      name="currency"
+                      value={form.currency}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-primary focus:ring-4 focus:ring-primary/10 shadow-sm outline-none transition-all sm:text-sm font-medium cursor-pointer"
                     >
                       <option>USD</option>
                       <option>EUR</option>
@@ -929,6 +1082,9 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                       <option>AUD</option>
                     </select>
                   </div>
+                  <p className="md:col-span-3 text-xs text-slate-500 italic">
+                    Leave blank to display as "Competitive Salary"
+                  </p>
                 </div>
               </div>
 
@@ -942,15 +1098,15 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                 </h3>
                 <div>
                   <div className="flex gap-2 mb-3">
-                    <input 
-                      value={tagInput} 
+                    <input
+                      value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem(tagInput, setTagInput, 'tags'))}
-                      className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                      placeholder="Add tags like React, TypeScript, etc." 
+                      className="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="Add tags like React, TypeScript, etc."
                     />
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => addItem(tagInput, setTagInput, 'tags')}
                       className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition-all"
                     >
@@ -983,31 +1139,31 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                 <p className="text-sm text-gray-600 mb-4">Add contact information for hiring managers or recruiters candidates can reach out to.</p>
                 <div className="space-y-3">
                   <div className="grid md:grid-cols-3 gap-3">
-                    <input 
-                      value={contactName} 
+                    <input
+                      value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addContact())}
-                      className="px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                      placeholder="Contact name" 
+                      className="px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="Contact name"
                     />
-                    <input 
+                    <input
                       type="email"
-                      value={contactEmail} 
+                      value={contactEmail}
                       onChange={(e) => setContactEmail(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addContact())}
-                      className="px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                      placeholder="Email address" 
+                      className="px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="Email address"
                     />
-                    <input 
-                      value={contactTitle} 
+                    <input
+                      value={contactTitle}
                       onChange={(e) => setContactTitle(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addContact())}
-                      className="px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm" 
-                      placeholder="Job title (optional)" 
+                      className="px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 sm:text-sm"
+                      placeholder="Job title (optional)"
                     />
                   </div>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={addContact}
                     className="px-6 py-3 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold transition-all"
                   >
@@ -1022,9 +1178,9 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                             <p className="text-sm text-gray-600">{contact.email}</p>
                             {contact.title && <p className="text-xs text-gray-500">{contact.title}</p>}
                           </div>
-                          <button 
-                            type="button" 
-                            onClick={() => removeContact(i)} 
+                          <button
+                            type="button"
+                            onClick={() => removeContact(i)}
                             className="text-red-600 hover:text-red-800"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1038,6 +1194,193 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                 </div>
               </div>
 
+              {/* Auto-Reply Settings */}
+              <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="h-10 w-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  Auto-Reply Settings
+                </h3>
+
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Enable Auto-Reply</h4>
+                      <p className="text-sm text-gray-600">Automatically send a confirmation email to candidates when they apply.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={form.autoReplyEnabled}
+                        onChange={(e) => setForm(prev => ({ ...prev, autoReplyEnabled: e.target.checked }))}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+
+                  {form.autoReplyEnabled && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-gray-700">Auto-Reply Subject</label>
+                          <input
+                            value={form.autoReplySubject}
+                            onChange={(e) => setForm(prev => ({ ...prev, autoReplySubject: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                            placeholder="e.g. Application Received: {job_title}"
+                          />
+                          <p className="text-xs text-gray-500">Default: Application Received: {form.title}</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-gray-700">Hiring Contact Name (Variable)</label>
+                          <input
+                            value={form.hiringContactName}
+                            onChange={(e) => setForm(prev => ({ ...prev, hiringContactName: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                            placeholder="e.g. Jane Doe"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-gray-700">Hiring Contact Email (Variable)</label>
+                          <input
+                            type="email"
+                            value={form.hiringContactEmail}
+                            onChange={(e) => setForm(prev => ({ ...prev, hiringContactEmail: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                            placeholder="e.g. jane@company.com"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-gray-700">Confirmation Message</label>
+                        <textarea
+                          rows={6}
+                          value={form.autoReplyMessage}
+                          onChange={(e) => setForm(prev => ({ ...prev, autoReplyMessage: e.target.value }))}
+                          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all sm:text-sm resize-none"
+                          placeholder="Write your confirmation message here..."
+                        />
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded">Available variables:</span>
+                          {['{first_name}', '{last_name}', '{full_name}', '{job_title}', '{company_name}', '{hiring_contact_name}', '{hiring_contact_email}'].map(v => (
+                            <code key={v} className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded cursor-pointer hover:bg-indigo-100" onClick={() => setForm(prev => ({ ...prev, autoReplyMessage: prev.autoReplyMessage + v }))}>
+                              {v}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Messaging Settings */}
+              <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="h-10 w-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  Messaging Settings
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-purple-50 border border-purple-100 rounded-xl">
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Enable Messaging</h4>
+                      <p className="text-sm text-gray-600">Allow candidates and employers to exchange messages about this position.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={form.allowMessaging}
+                        onChange={(e) => setForm(prev => ({ ...prev, allowMessaging: e.target.checked }))}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                  </div>
+
+                  {form.allowMessaging && (
+                    <div className="flex items-center justify-between p-4 bg-purple-50 border border-purple-100 rounded-xl animate-in fade-in slide-in-from-top-4 duration-300">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Allow Candidate Replies</h4>
+                        <p className="text-sm text-gray-600">When disabled, candidates can receive but not send messages. You can always send messages.</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={form.allowReplies}
+                          onChange={(e) => setForm(prev => ({ ...prev, allowReplies: e.target.checked }))}
+                          disabled={!form.allowMessaging}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"></div>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Rejection Notification Settings */}
+              <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                  <div className="h-10 w-10 bg-red-50 rounded-xl flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  Rejection Notification Settings
+                </h3>
+
+                <div className="space-y-6">
+                  <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
+                    <h4 className="font-semibold text-gray-900 text-sm">Automated Rejection Email</h4>
+                    <p className="text-xs text-gray-600 mt-1">This email will be sent automatically to candidates when their application is marked as "Rejected". Leave blank if you don't want to send an automatic email.</p>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Rejection Subject</label>
+                      <input
+                        value={form.rejectionSubject}
+                        onChange={(e) => setForm(prev => ({ ...prev, rejectionSubject: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all sm:text-sm"
+                        placeholder="e.g. Update on your application for {job_title}"
+                      />
+                      <p className="text-[10px] text-gray-500">Default: Update on your application: {form.title || 'Job Title'}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Rejection Message</label>
+                      <textarea
+                        rows={6}
+                        value={form.rejectionMessage}
+                        onChange={(e) => setForm(prev => ({ ...prev, rejectionMessage: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all sm:text-sm resize-none"
+                        placeholder="Write your rejection message here..."
+                      />
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded">Available variables:</span>
+                        {['{first_name}', '{last_name}', '{full_name}', '{job_title}', '{company_name}'].map(v => (
+                          <code key={v} className="text-[10px] bg-orange-50 text-orange-700 px-2 py-1 rounded cursor-pointer hover:bg-orange-100" onClick={() => setForm(prev => ({ ...prev, rejectionMessage: prev.rejectionMessage + v }))}>
+                            {v}
+                          </code>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Application Requirements */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -1047,11 +1390,11 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   Application Requirements (Optional)
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">Choose what applicants must provide. Select profile only, CV only, or both.</p>
-                
+
                 <div className="space-y-4">
                   <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       id="requireProfile"
                       checked={form.requireProfile}
                       onChange={(e) => handleChange({ target: { name: 'requireProfile', type: 'checkbox', checked: e.target.checked } })}
@@ -1064,8 +1407,8 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   </div>
 
                   <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       id="requireCv"
                       checked={form.requireCv}
                       onChange={(e) => handleChange({ target: { name: 'requireCv', type: 'checkbox', checked: e.target.checked } })}
@@ -1081,10 +1424,10 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                   {form.requireProfile && (
                     <div className="border-t border-gray-200 pt-4 space-y-4">
                       <h4 className="font-semibold text-sm text-gray-900">Profile Requirements</h4>
-                      
+
                       <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           id="requireExperience"
                           checked={form.requireExperience}
                           onChange={(e) => handleChange({ target: { name: 'requireExperience', type: 'checkbox', checked: e.target.checked } })}
@@ -1097,8 +1440,8 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                       </div>
 
                       <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           id="requireEducation"
                           checked={form.requireEducation}
                           onChange={(e) => handleChange({ target: { name: 'requireEducation', type: 'checkbox', checked: e.target.checked } })}
@@ -1149,7 +1492,7 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                               {form.requireLanguages.map((lang, idx) => (
                                 <span key={idx} className="text-xs bg-white px-3 py-1 rounded border border-gray-300 flex items-center gap-2">
                                   {lang}
-                                  <button 
+                                  <button
                                     type="button"
                                     onClick={() => handleChange({ target: { name: 'requireLanguages', type: 'array-remove', value: idx } })}
                                     className="text-red-600 hover:text-red-800 font-bold"
@@ -1207,7 +1550,7 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                               {req.fileTypes?.join(', ') || 'Any file'} • {req.required ? 'Required' : 'Optional'}
                             </div>
                           </div>
-                          <button 
+                          <button
                             type="button"
                             onClick={() => setForm(prev => ({ ...prev, customFileRequirements: prev.customFileRequirements.filter((_, i) => i !== idx) }))}
                             className="text-red-600 hover:text-red-800 ml-3"
@@ -1283,37 +1626,52 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
 
               {/* Active Status */}
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <input 
-                  type="checkbox" 
-                  id="active" 
-                  name="active" 
-                  checked={form.active} 
-                  onChange={handleChange} 
+                <input
+                  type="checkbox"
+                  id="active"
+                  name="active"
+                  checked={form.active}
+                  onChange={handleChange}
                   className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
                 />
                 <label htmlFor="active" className="text-sm font-semibold text-gray-900">
-                  Publish this job immediately (uncheck to save as draft)
+                  Check to publish
                 </label>
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-                <button 
-                  type="button" 
+              <div className="flex items-center justify-between pt-8 border-t border-gray-100 mt-8">
+                <button
+                  type="button"
                   onClick={onCancel}
-                  className="px-6 py-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold transition-all"
+                  className="px-6 py-3 rounded-xl text-gray-600 font-semibold hover:bg-gray-50 hover:text-gray-900 transition-all flex items-center gap-2"
                 >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   disabled={saving}
-                  className={`px-6 py-3 rounded-lg font-semibold shadow-sm transition-all flex items-center gap-2 ${saving ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover text-white'}`}
+                  className={`px-8 py-4 rounded-xl font-bold shadow-lg text-lg transition-all transform active:scale-95 flex items-center gap-3 ${saving ? 'bg-gray-100 text-gray-400 shadow-none cursor-not-allowed' : 'bg-gradient-to-r from-primary to-primary-hover text-white shadow-primary/30 hover:shadow-primary/40 hover:-translate-y-0.5'}`}
                 >
-                  {saving ? 'Saving...' : isEdit ? 'Update Job' : 'Post Job'}
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  {saving ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      {isEdit ? 'Update Job Listing' : 'Post Job Now'}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1336,14 +1694,14 @@ export function JobForm({ tenant, onSubmit, onCancel, saving = false, initialJob
                 Are you sure you want to publish this job? Once posted, candidates will be able to see and apply to this position.
               </p>
               <div className="flex gap-3 justify-end">
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowConfirmDialog(false)}
                   className="px-6 py-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold transition-all"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="button"
                   onClick={submitForm}
                   disabled={saving}

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tenants Management | Admin Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1337ec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101322",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900">
+<div class="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 bg-white px-6 md:px-10 py-3 sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-3 text-primary">
+<div class="size-8 flex items-center justify-center bg-primary/10 rounded-lg">
+<span class="material-symbols-outlined">shield_person</span>
+</div>
+<h2 class="text-slate-900 text-lg font-bold leading-tight tracking-[-0.015em]">Admin Portal</h2>
+</div>
+<label class="hidden md:flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+<div class="text-slate-400 flex border-none bg-slate-100 items-center justify-center pl-4 rounded-l-lg" data-icon="search">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-slate-100 focus:ring-0 h-full placeholder:text-slate-500 px-4 rounded-r-lg pl-2 text-sm font-normal" placeholder="Search tenants..." value=""/>
+</div>
+</label>
+</div>
+<div class="flex items-center justify-end gap-4">
+<div class="flex gap-2">
+<button class="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
+<div class="flex items-center gap-3">
+<div class="text-right hidden sm:block">
+<p class="text-xs font-bold text-slate-900">Alex Rivera</p>
+<p class="text-[10px] text-slate-500 uppercase tracking-wider">Super Admin</p>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/20" data-alt="Admin user profile avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAMWzz2vo4gz3iGqsK8FWfrv69jHRN__7gFSlFk5aE7tsdxwRzkI-F6mLdHtZl0OaVoJ-CX6BYwm2lfodJa_7PT_ndz6BmM7_2ED84PoELUZaREGJjElBdK0sj8gA1PD-xYt2jwpjvhO5-l3MbY8Nh7vRG_oivLY9Uk4HrBnoeOVtzdohHZKVtAitrq08dEvx4ApvG0CyLYuvUKbNegBBD-35-bz-KFduS4aCx6hVlPAVMqnObtq2hnFW76M1jGxBLzFCGoiJnzDFQ");'></div>
+</div>
+</div>
+</header>
+<div class="flex flex-1">
+<!-- Sidebar -->
+<aside class="w-64 hidden lg:flex flex-col bg-white border-r border-slate-200 p-4 shrink-0">
+<div class="flex flex-col gap-1">
+<p class="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Main Menu</p>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 bg-primary/10 text-primary rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined">corporate_fare</span>
+<span class="text-sm font-semibold">Tenants</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">analytics</span>
+<span class="text-sm font-medium">Usage</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">payments</span>
+<span class="text-sm font-medium">Billing</span>
+</a>
+<p class="px-3 py-2 mt-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Support</p>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">help</span>
+<span class="text-sm font-medium">Documentation</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">chat</span>
+<span class="text-sm font-medium">Contact Support</span>
+</a>
+</div>
+<div class="mt-auto p-4 bg-slate-50 rounded-xl border border-slate-100">
+<p class="text-xs font-bold text-slate-900 mb-1">System Status</p>
+<div class="flex items-center gap-2 mb-3">
+<span class="size-2 bg-emerald-500 rounded-full"></span>
+<span class="text-[11px] text-slate-600">All services operational</span>
+</div>
+<button class="w-full text-center py-1.5 text-xs font-bold text-primary border border-primary/20 rounded-md hover:bg-primary/5 transition-colors">
+                            View Logs
+                        </button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col min-w-0">
+<!-- Page Header Section -->
+<div class="flex flex-wrap items-center justify-between gap-4 p-6 md:p-8 bg-white border-b border-slate-200">
+<div class="flex flex-col gap-1">
+<h1 class="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Tenants</h1>
+<p class="text-slate-500 text-sm">Manage your <span class="font-semibold text-slate-700">124</span> active organizations across all regions.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 h-10 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-lg transition-all text-sm font-bold">
+<span class="material-symbols-outlined text-[20px]">file_download</span>
+<span>Export</span>
+</button>
+<button class="flex items-center gap-2 px-5 h-10 bg-primary text-white hover:bg-primary/90 rounded-lg transition-all text-sm font-bold shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span>Add Tenant</span>
+</button>
+</div>
+</div>
+<!-- Filter Tabs -->
+<div class="bg-white border-b border-slate-200 px-6 md:px-8">
+<div class="flex gap-8">
+<a class="border-b-2 border-primary py-4 text-primary text-sm font-bold flex items-center gap-2" href="#">
+                                All Tenants <span class="bg-primary/10 px-2 py-0.5 rounded text-[10px]">124</span>
+</a>
+<a class="border-b-2 border-transparent py-4 text-slate-500 hover:text-slate-700 text-sm font-semibold transition-colors" href="#">
+                                Active
+                            </a>
+<a class="border-b-2 border-transparent py-4 text-slate-500 hover:text-slate-700 text-sm font-semibold transition-colors" href="#">
+                                Pending
+                            </a>
+<a class="border-b-2 border-transparent py-4 text-slate-500 hover:text-slate-700 text-sm font-semibold transition-colors" href="#">
+                                Suspended
+                            </a>
+</div>
+</div>
+<!-- Search and Actions Bar -->
+<div class="p-6 md:px-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+<div class="relative w-full md:max-w-md">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
+<input class="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" placeholder="Search by organization name, email or domain..." type="text"/>
+</div>
+<div class="flex items-center gap-3 w-full md:w-auto">
+<select class="form-select border-slate-200 rounded-lg text-sm bg-white focus:ring-primary/20 focus:border-primary pr-10 w-full md:w-auto">
+<option>Sort by: Newest</option>
+<option>Sort by: Name (A-Z)</option>
+<option>Sort by: Users (High-Low)</option>
+<option>Sort by: Status</option>
+</select>
+<button class="flex items-center justify-center size-10 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</div>
+<!-- Table Container -->
+<div class="px-6 md:px-8 pb-8 flex-1">
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-slate-50/50 border-b border-slate-200">
+<tr>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Organization</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Plan</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Active Users</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50/80 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center overflow-hidden shrink-0">
+<img class="size-full object-cover" data-alt="Corporate logo of Acme Corp" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBK7aL2zaCrFVVzgBtJsTg-RPUza605Z6uO31KTfTrrZr1JAYLlk8fp6Yz8pIhbYcxoc4CEiLgyMY_zdrULGV8xpKjiQdgW9z55Qzl6pOaBAGexMhB-5r3nr1tK_0RxppA_ssgWNouZVkhfmBnCE4leTCBRy1QWirs8k_ZiRDpepeIbYPS7utMgWvc2zYXk7IfEqusaYjZ5SFUeTE0ROjF0kFEP6ldESsbIRmOaqZNJ9MjXlE5DXdc7y5C_MLB9i0CMBcs3J-z5MY"/>
+</div>
+<div class="flex flex-col">
+<p class="text-sm font-bold text-slate-900 group-hover:text-primary transition-colors cursor-pointer">Acme Corp</p>
+<p class="text-xs text-slate-500">contact@acme.com</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                                    Enterprise
+                                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<p class="text-sm font-semibold text-slate-700">1,248</p>
+<div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 85%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5 text-emerald-600">
+<span class="size-2 bg-emerald-500 rounded-full"></span>
+<span class="text-xs font-bold">Active</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all" title="View Details">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Suspend">
+<span class="material-symbols-outlined text-[20px]">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50/80 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center overflow-hidden shrink-0">
+<img class="size-full object-cover" data-alt="Startup tech logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq-0daq4ri_Es9YQRShJBFCnKmkEDksKboWjHJb0DlTsOOtrKlsjzWqRgDWyNT3p49RZMpwCP4sfYxGYSwAo-cXV6ec-34j7nhcNzS4L3N7txPzf09i3sAmF7Ab82T6hQ8quN7KfIbjjdEXhP67wJ092-CvcAcAq0RlUIp9lnD2AvKvgymbm8dzZeDH5hOxJ0ZmOoECPEWWS-1w8JmTOQmorKLbg2f8k2Dp2ekCN37VKEsZ9yCDvvmlsIYZW9gK1S-_o7gwfVD41I"/>
+</div>
+<div class="flex flex-col">
+<p class="text-sm font-bold text-slate-900 group-hover:text-primary transition-colors cursor-pointer">Nebula Tech</p>
+<p class="text-xs text-slate-500">ops@nebulat.io</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                                                    Pro
+                                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<p class="text-sm font-semibold text-slate-700">432</p>
+<div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 45%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5 text-emerald-600">
+<span class="size-2 bg-emerald-500 rounded-full"></span>
+<span class="text-xs font-bold">Active</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all" title="View Details">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Suspend">
+<span class="material-symbols-outlined text-[20px]">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50/80 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center overflow-hidden shrink-0">
+<img class="size-full object-cover" data-alt="Modern creative agency logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAuBgtLy6zLa55JLAaVB7OFuZO95FAjh1G7lOMp0WJ1CE0kxkKB5FPtaDQZ9a9JCZlh6iZbDW-JRTDdIYoQVgifsvT17cZwqUkzstTwrc3HZE8PFnEfBZTLRzecQ-0AauFggqCY-Wjotydv0kIctm_690a0iCTRciOM6E2psdDtLx3jFMvQMheAEzKNdTzJJNSFpouOC7F3F62CvobIvb4br5vr_yZZ0ppcef2JDpAXfrGlc1Tt0g9uzNDkjUoPtf-WiMTDXdaEHXY"/>
+</div>
+<div class="flex flex-col">
+<p class="text-sm font-bold text-slate-900 group-hover:text-primary transition-colors cursor-pointer">Global Logistics</p>
+<p class="text-xs text-slate-500">admin@globallog.com</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                                    Enterprise
+                                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<p class="text-sm font-semibold text-slate-700">2,810</p>
+<div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 95%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5 text-amber-500">
+<span class="size-2 bg-amber-500 rounded-full"></span>
+<span class="text-xs font-bold">Pending</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all" title="View Details">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Suspend">
+<span class="material-symbols-outlined text-[20px]">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50/80 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+<img class="size-full object-cover" data-alt="Design agency icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWmTohpZLiipSpYavA2cKdEi9IGY0bufJ-BgPtRzZsziGNz7JSG1IVUxASkhSpg2HCT-QH4VotbOSPfMkKeQdM7UPJhKzMCJaU_wt_HE5qIn6nWc3kZdJcvJDJAm_dXev5jWp6T-qLqJBOTYBWucQxiwLAicwfuHsjnFlDqMuBNVwb4gSKVbm7ExxmftDL08qOQNf4k_9domf1b_vGT_00GMQu9jR7c3RujNbIuSHyN-tKOtefP6Uc-GmYiM9xrVzl68aqk7eJPMI"/>
+</div>
+<div class="flex flex-col">
+<p class="text-sm font-bold text-slate-900 group-hover:text-primary transition-colors cursor-pointer">Stellar Design</p>
+<p class="text-xs text-slate-500">billing@stellar.xyz</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                                                    Free
+                                                </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<p class="text-sm font-semibold text-slate-700">12</p>
+<div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 5%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-1.5 text-slate-400">
+<span class="size-2 bg-slate-400 rounded-full"></span>
+<span class="text-xs font-bold">Suspended</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all" title="View Details">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+</button>
+<button class="p-2 text-primary hover:bg-primary/5 rounded-lg transition-all" title="Activate">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 bg-slate-50/50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-4">
+<p class="text-sm text-slate-500">
+                                    Showing <span class="font-bold text-slate-900">1</span> to <span class="font-bold text-slate-900">10</span> of <span class="font-bold text-slate-900">124</span> tenants
+                                </p>
+<div class="flex items-center gap-2">
+<button class="flex items-center justify-center size-8 rounded border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 transition-colors">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="flex items-center justify-center size-8 rounded bg-primary text-white text-xs font-bold shadow-md shadow-primary/20">
+                                        1
+                                    </button>
+<button class="flex items-center justify-center size-8 rounded border border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary text-xs font-bold transition-all">
+                                        2
+                                    </button>
+<button class="flex items-center justify-center size-8 rounded border border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary text-xs font-bold transition-all">
+                                        3
+                                    </button>
+<span class="text-slate-400 px-1">...</span>
+<button class="flex items-center justify-center size-8 rounded border border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary text-xs font-bold transition-all">
+                                        13
+                                    </button>
+<button class="flex items-center justify-center size-8 rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</div>
+</body></html>

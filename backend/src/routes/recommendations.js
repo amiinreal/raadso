@@ -1,37 +1,92 @@
 import express from 'express'
 import { query } from '../db.js'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const router = express.Router()
 
+// AI Recommendation Helper
+const getAIRecommendations = async (candidate, jobs, limit) => {
+  try {
+    if (!process.env.GEMINI_API_KEY) return null
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    // Use gemini-2.0-flash which is the latest performant model, or fallback to gemini-pro if needed
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
+
+    // Prepare prompt
+    const candidateSummary = {
+      headline: candidate.headline,
+      skills: candidate.skills,
+      titles: candidate.previous_titles,
+      interests: candidate.interested_positions,
+      experience: candidate.years_of_experience
+    }
+
+    const jobsSummary = jobs.map(j => ({
+      id: j.id,
+      title: j.title,
+      skills: j.required_skills,
+      description: j.description?.substring(0, 200) // Brief context
+    }))
+
+    const prompt = `
+      Act as an expert detailed job recruiter.
+      I have a candidate with this profile: ${JSON.stringify(candidateSummary)}
+      
+      And these available jobs: ${JSON.stringify(jobsSummary)}
+      
+      Identify the top ${limit} jobs that best match this candidate.
+      Focus on skills overlap, title relevance, and interests.
+      
+      Return ONLY a JSON array of objects with 'id' and 'score' (0-100).
+      Example: [{"id": "...", "score": 95}, {"id": "...", "score": 80}]
+      Do not include markdown formatting.
+    `
+
+    const result = await model.generateContent(prompt)
+    const response = await result.response
+    const text = response.text().replace(/```json|```/g, '').trim()
+    
+    return JSON.parse(text)
+  } catch (error) {
+    console.error('AI Recommendation Error:', error)
+    return null
+  }
+}
+
 // Enhanced algorithm to calculate job compatibility score with user behavior
-const calculateCompatibility = (job, candidateSkills, candidateExperience, userPreferences, userInteractions = {}) => {
+const calculateCompatibility = (job, candidateData, userPreferences, userInteractions = {}, userSearches = []) => {
+  const candidateSkills = candidateData.skills || []
+  const candidateExperience = candidateData.years_of_experience || 0
   let score = 0
   let componentScores = {
     skillMatch: 0,
     categoryMatch: 0,
     experienceMatch: 0,
-    behaviorMatch: 0
+    behaviorMatch: 0,
+    searchMatch: 0,
+    profileMatch: 0
   }
 
-  // Skill matching (30% weight)
+  // Skill matching (25% weight)
   if (job.required_skills && job.required_skills.length > 0 && candidateSkills && candidateSkills.length > 0) {
     const skillLower = candidateSkills.map(s => s.toLowerCase())
-    const matchedSkills = job.required_skills.filter(s => 
+    const matchedSkills = job.required_skills.filter(s =>
       skillLower.some(cs => cs.includes(s.toLowerCase()) || s.toLowerCase().includes(cs))
     )
     componentScores.skillMatch = (matchedSkills.length / job.required_skills.length) * 100
   }
 
-  // Category/Tag matching (25% weight) - what user has explicitly liked
+  // Category/Tag matching (20% weight) - what user has explicitly liked
   if (job.tags && job.tags.length > 0 && userPreferences && userPreferences.length > 0) {
     const preferenceTags = userPreferences.map(p => p.tag.toLowerCase())
-    const matchedTags = job.tags.filter(tag => 
+    const matchedTags = job.tags.filter(tag =>
       preferenceTags.some(pt => pt.includes(tag.toLowerCase()) || tag.toLowerCase().includes(pt))
     )
     componentScores.categoryMatch = (matchedTags.length / job.tags.length) * 100
   }
 
-  // Experience matching (20% weight)
+  // Experience matching (15% weight)
   if (job.seniority_level && candidateExperience) {
     const seniorityMap = {
       'entry-level': 0,
@@ -43,13 +98,13 @@ const calculateCompatibility = (job, candidateSkills, candidateExperience, userP
     }
     const jobSeniority = seniorityMap[job.seniority_level?.toLowerCase()] || 2
     const candidateSeniority = Math.min(candidateExperience / 5, 5) // Normalize years to 0-5
-    
+
     // Give points for matching or slightly higher experience
     const diff = Math.abs(jobSeniority - candidateSeniority)
     componentScores.experienceMatch = Math.max(0, 100 - (diff * 20))
   }
 
-  // User behavior matching (25% weight) - what they've actually engaged with
+  // User behavior matching (20% weight) - what they've actually engaged with
   // Saved jobs = strongest signal (user proactively saved it)
   // Likes = strong signal (explicit preference)
   // Views = weak signal (interest shown)
@@ -58,22 +113,90 @@ const calculateCompatibility = (job, candidateSkills, candidateExperience, userP
     if (userInteractions.saved) behaviorScore += 50 // Saved = 50 points
     if (userInteractions.liked) behaviorScore += 25 // Liked = 25 points
     if (userInteractions.viewed) behaviorScore += 10 // Viewed = 10 points
-    
+
     componentScores.behaviorMatch = Math.min(100, behaviorScore)
   }
 
+  // Search History Matching (20% weight)
+  // Check if job title or tags match recent search queries
+  if (userSearches && userSearches.length > 0) {
+    let searchScore = 0
+    const jobText = `${job.title} ${job.description} ${job.tags?.join(' ')}`.toLowerCase()
+
+    // We only take the top 5 recent searches
+    const recentSearches = userSearches.slice(0, 5)
+
+    recentSearches.forEach(search => {
+      if (jobText.includes(search.query.toLowerCase())) {
+        searchScore += 20 // 20 points per match, up to 100
+      }
+    })
+
+    componentScores.searchMatch = Math.min(100, searchScore)
+  }
+
+  // Profile Matching (25% weight)
+  // Match candidate headline, summary, and previous titles against job title/description
+  if (candidateData) {
+    let profileScore = 0
+    const jobText = `${job.title} ${job.about_role} ${job.about_company}`.toLowerCase()
+
+    // 1. Headline match
+    if (candidateData.headline && jobText.includes(candidateData.headline.toLowerCase())) {
+      profileScore += 30
+    }
+
+    // 2. Summary match (keyword overlap)
+    if (candidateData.summary) {
+      const summaryWords = candidateData.summary.toLowerCase().split(/\s+/).filter(w => w.length > 4)
+      const matches = summaryWords.filter(w => jobText.includes(w))
+      profileScore += Math.min(30, matches.length * 5)
+    }
+
+    // 3. Previous titles match
+    if (candidateData.previous_titles && candidateData.previous_titles.length > 0) {
+      const titleMatches = candidateData.previous_titles.filter(title =>
+        title && jobText.includes(title.toLowerCase())
+      )
+      profileScore += Math.min(20, titleMatches.length * 10)
+    }
+
+    // 4. Interested positions match (Keyword based fuzzy match)
+    if (candidateData.interested_positions && candidateData.interested_positions.length > 0) {
+      // Split interests into keywords (e.g., "Web Development" -> ["web", "development"])
+      const interestKeywords = candidateData.interested_positions
+        .flatMap(pos => pos ? pos.toLowerCase().split(/\s+/) : [])
+        .filter(w => w.length > 3) // Filter out short words like 'and', 'the'
+      
+      const uniqueKeywords = [...new Set(interestKeywords)]
+      
+      const keywordMatches = uniqueKeywords.filter(keyword => jobText.includes(keyword))
+      
+      // If we match key terms like "web", "react", "manager", give points
+      if (keywordMatches.length > 0) {
+         profileScore += Math.min(30, keywordMatches.length * 10)
+      }
+    }
+
+    componentScores.profileMatch = Math.min(100, profileScore)
+  }
+
   // Calculate weighted score
-  score = (componentScores.skillMatch * 0.30) + 
-          (componentScores.categoryMatch * 0.25) + 
-          (componentScores.experienceMatch * 0.20) +
-          (componentScores.behaviorMatch * 0.25)
+  score = (componentScores.skillMatch * 0.20) +
+    (componentScores.categoryMatch * 0.15) +
+    (componentScores.experienceMatch * 0.10) +
+    (componentScores.behaviorMatch * 0.15) +
+    (componentScores.searchMatch * 0.15) +
+    (componentScores.profileMatch * 0.25)
 
   return {
     score: Math.round(score),
     skillMatch: Math.round(componentScores.skillMatch),
     categoryMatch: Math.round(componentScores.categoryMatch),
     experienceMatch: Math.round(componentScores.experienceMatch),
-    behaviorMatch: Math.round(componentScores.behaviorMatch)
+    behaviorMatch: Math.round(componentScores.behaviorMatch),
+    searchMatch: Math.round(componentScores.searchMatch),
+    profileMatch: Math.round(componentScores.profileMatch)
   }
 }
 
@@ -83,16 +206,18 @@ router.get('/candidate/:candidateId/top-jobs', async (req, res) => {
     const { candidateId } = req.params
     const limit = req.query.limit || 3
 
-    // Get candidate profile with skills and experience
+    // Get candidate profile and user_id
     const candidateResult = await query(
-      `SELECT cp.id, cp.years_of_experience, 
-              json_agg(DISTINCT s.skill_name) as skills,
-              json_agg(DISTINCT CASE WHEN we.id IS NOT NULL THEN we.job_title ELSE NULL END) as previous_titles
+      `SELECT cp.id, cp.user_id, cp.years_of_experience, cp.headline, cp.summary,
+              json_agg(DISTINCT s.skill_name) FILTER (WHERE s.skill_name IS NOT NULL) as skills,
+              json_agg(DISTINCT we.job_title) FILTER (WHERE we.job_title IS NOT NULL) as previous_titles,
+              json_agg(DISTINCT cip.position_title) FILTER (WHERE cip.position_title IS NOT NULL) as interested_positions
        FROM candidate_profiles cp
        LEFT JOIN skills s ON cp.id = s.candidate_id
        LEFT JOIN work_experiences we ON cp.id = we.candidate_id
+       LEFT JOIN candidate_interested_positions cip ON cp.id = cip.candidate_id
        WHERE cp.id = $1
-       GROUP BY cp.id, cp.years_of_experience`,
+       GROUP BY cp.id, cp.user_id, cp.years_of_experience, cp.headline, cp.summary`,
       [candidateId]
     )
 
@@ -110,6 +235,16 @@ router.get('/candidate/:candidateId/top-jobs', async (req, res) => {
 
     const preferences = preferencesResult.rows || []
 
+    // Get user recent searches
+    let recentSearches = []
+    if (candidate.user_id) {
+      const searchResult = await query(
+        `SELECT query FROM user_searches WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`,
+        [candidate.user_id]
+      )
+      recentSearches = searchResult.rows || []
+    }
+
     // Get all user interactions (saved, liked, viewed)
     const interactionsResult = await query(
       `SELECT job_id, interaction_type 
@@ -126,9 +261,10 @@ router.get('/candidate/:candidateId/top-jobs', async (req, res) => {
       interactions[row.job_id][row.interaction_type] = true
     })
 
-    // Get active jobs
+    // Get active jobs with tags
     const jobsResult = await query(
-      `SELECT j.*, t.company_name 
+      `SELECT j.*, t.company_name,
+              (SELECT json_agg(jt.tag) FROM job_tags jt WHERE jt.job_id = j.id) as tags
        FROM jobs j
        LEFT JOIN tenants t ON j.tenant_id = t.id
        WHERE j.active = true
@@ -137,26 +273,44 @@ router.get('/candidate/:candidateId/top-jobs', async (req, res) => {
 
     const jobs = jobsResult.rows || []
 
-    // Calculate compatibility for each job with user interactions
-    const jobsWithScores = jobs.map(job => {
-      const compatibility = calculateCompatibility(
-        job,
-        candidate.skills,
-        candidate.years_of_experience,
-        preferences,
-        interactions[job.id] || {}
-      )
-      return {
-        ...job,
-        ...compatibility
-      }
-    })
+    // Check Config for AI
+    let topJobs = []
+    const configRes = await query(`SELECT value FROM platform_config WHERE key = 'enable_ai_recommendations'`)
+    const useAI = configRes.rows.length > 0 && configRes.rows[0].value === 'true'
 
-    // Sort by score and get top N
-    const topJobs = jobsWithScores
-      .filter(j => j.score > 30) // Only return jobs with >30% compatibility
-      .sort((a, b) => b.score - a.score)
-      .slice(0, parseInt(limit))
+    if (useAI && jobs.length > 0) {
+       const aiRecs = await getAIRecommendations(candidate, jobs, parseInt(limit))
+       if (aiRecs && Array.isArray(aiRecs)) {
+          topJobs = aiRecs.map(rec => {
+              const job = jobs.find(j => j.id === rec.id)
+              return job ? { ...job, score: rec.score, match_type: 'AI Recommended' } : null
+          }).filter(Boolean)
+       }
+    }
+
+    // Fallback if AI didn't run or returned nothing
+    if (topJobs.length === 0) {
+        // Calculate compatibility for each job with user interactions
+        const jobsWithScores = jobs.map(job => {
+          const compatibility = calculateCompatibility(
+            job,
+            candidate,
+            preferences,
+            interactions[job.id] || {},
+            recentSearches
+          )
+          return {
+            ...job,
+            ...compatibility
+          }
+        })
+
+        // Sort by score and get top N
+        topJobs = jobsWithScores
+          .filter(j => j.score > 10) // Lowered threshold to 10% to show broader matches
+          .sort((a, b) => b.score - a.score)
+          .slice(0, parseInt(limit))
+    }
 
     res.json(topJobs)
   } catch (err) {
@@ -174,8 +328,8 @@ router.post('/candidate/:candidateId/job/:jobId/interact', async (req, res) => {
     // If it's a like, update user preferences
     if (interactionType === 'like') {
       // Get job tags to add to preferences
-      const jobResult = await query('SELECT tags FROM jobs WHERE id = $1', [jobId])
-      const tags = jobResult.rows[0]?.tags || []
+      const jobResult = await query('SELECT tag FROM job_tags WHERE job_id = $1', [jobId])
+      const tags = jobResult.rows.map(r => r.tag)
 
       for (const tag of tags) {
         await query(
@@ -492,7 +646,7 @@ router.get('/candidate/:candidateId/saved-jobs', async (req, res) => {
     sql += ` ORDER BY sj.saved_at DESC`
 
     const result = await query(sql, params)
-    
+
     const jobsWithDetails = result.rows.map(row => ({
       id: row.job_id,
       job_id: row.job_id,
@@ -568,13 +722,13 @@ router.get('/candidate/:candidateId/notifications', async (req, res) => {
       LEFT JOIN jobs j ON n.job_id = j.id
       WHERE n.candidate_id = $1
     `
-    
+
     const params = [candidateId]
-    
+
     if (unreadOnly === 'true' || unreadOnly === true) {
       sql += ` AND n.is_read = false`
     }
-    
+
     sql += ` ORDER BY n.created_at DESC LIMIT 50`
 
     const result = await query(sql, params)
@@ -613,18 +767,18 @@ router.put('/candidate/:candidateId/notifications/:notificationId/read', async (
 router.post('/candidate/:candidateId/check-deadline-notifications', async (req, res) => {
   try {
     const { candidateId } = req.params
-    
+
     // Resolve candidateId if it's actually a userId
     let actualCandidateId = candidateId
     const userCheckResult = await query(
       `SELECT id FROM candidate_profiles WHERE id = $1 OR user_id = $1 LIMIT 1`,
       [candidateId]
     )
-    
+
     if (userCheckResult.rows.length > 0) {
       actualCandidateId = userCheckResult.rows[0].id
     }
-    
+
     console.log(`[Deadline Check] Starting check for candidate ${actualCandidateId} (input: ${candidateId})`)
 
     // First check if candidate has any saved jobs at all
@@ -665,7 +819,7 @@ router.post('/candidate/:candidateId/check-deadline-notifications', async (req, 
        WHERE candidate_id = $1 AND type = 'deadline_alert'`,
       [actualCandidateId]
     )
-    
+
     // Map existing notifications by job_id and notification_time
     const existingNotifications = new Map()
     existingResult.rows.forEach(row => {
@@ -677,7 +831,7 @@ router.post('/candidate/:candidateId/check-deadline-notifications', async (req, 
 
     const now = new Date()
     const createdNotifications = []
-  const checkedJobs = []
+    const checkedJobs = []
 
     // Create notifications for upcoming deadlines
     for (const row of savedJobsResult.rows) {
@@ -715,7 +869,7 @@ router.post('/candidate/:candidateId/check-deadline-notifications', async (req, 
                   row.application_deadline
                 ]
               )
-              
+
               if (notifResult.rows.length > 0) {
                 createdNotifications.push(notifResult.rows[0])
               }
@@ -726,7 +880,7 @@ router.post('/candidate/:candidateId/check-deadline-notifications', async (req, 
             console.log(`[Deadline Check] 5-day notification already exists for: ${row.title}`)
           }
         }
-        
+
         // Send 24-hour notification (less than 24 hours)
         if (hoursLeft < 24 && hoursLeft > 0) {
           const key = `${row.job_id}_24_hours`
@@ -747,7 +901,7 @@ router.post('/candidate/:candidateId/check-deadline-notifications', async (req, 
                   row.application_deadline
                 ]
               )
-              
+
               if (notifResult.rows.length > 0) {
                 createdNotifications.push(notifResult.rows[0])
               }
@@ -763,9 +917,9 @@ router.post('/candidate/:candidateId/check-deadline-notifications', async (req, 
 
     console.log(`[Deadline Check] Created ${createdNotifications.length} new notifications`)
 
-    res.json({ 
+    res.json({
       checked: checkedJobs.length,
-      created: createdNotifications.length, 
+      created: createdNotifications.length,
       notifications: createdNotifications,
       checkedJobs
     })

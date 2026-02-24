@@ -1,7 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { api } from '../api/api'
+import { useTranslation } from '../i18n/TranslationProvider'
 
 export function Applications({ applications = [], candidateId, token }) {
   const [selectedApplication, setSelectedApplication] = useState(null)
+  const { t } = useTranslation()
 
   const statusColors = {
     'applied': 'bg-blue-50 text-blue-700 border-blue-200',
@@ -19,28 +23,28 @@ export function Applications({ applications = [], candidateId, token }) {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            My Applications
+            {t('applications.myApplications')}
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">Your Job Applications</h2>
-          <p className="text-gray-600 text-sm">Track and manage all applications you've submitted</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">{t('applications.yourJobApplications')}</h2>
+          <p className="text-gray-600 text-sm">{t('applications.trackAndManage')}</p>
         </div>
 
         {/* Stats Overview */}
         <div className="grid md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs text-gray-500 font-semibold mb-1">TOTAL</p>
+            <p className="text-xs text-gray-500 font-semibold mb-1">{t('applications.stats.total')}</p>
             <p className="text-2xl font-bold text-gray-900">{applications.length}</p>
           </div>
           <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-            <p className="text-xs text-blue-600 font-semibold mb-1">APPLIED</p>
+            <p className="text-xs text-blue-600 font-semibold mb-1">{t('applications.stats.applied')}</p>
             <p className="text-2xl font-bold text-blue-700">{applications.filter(a => a.status === 'applied').length}</p>
           </div>
           <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
-            <p className="text-xs text-yellow-600 font-semibold mb-1">REVIEWING</p>
+            <p className="text-xs text-yellow-600 font-semibold mb-1">{t('applications.stats.reviewing')}</p>
             <p className="text-2xl font-bold text-yellow-700">{applications.filter(a => a.status === 'reviewing').length}</p>
           </div>
           <div className="bg-green-50 rounded-xl border border-green-200 p-4">
-            <p className="text-xs text-green-600 font-semibold mb-1">ACCEPTED</p>
+            <p className="text-xs text-green-600 font-semibold mb-1">{t('applications.stats.accepted')}</p>
             <p className="text-2xl font-bold text-green-700">{applications.filter(a => a.status === 'accepted').length}</p>
           </div>
         </div>
@@ -53,8 +57,8 @@ export function Applications({ applications = [], candidateId, token }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <p className="text-gray-600 mb-2 text-lg font-medium">No applications yet</p>
-            <p className="text-gray-500 text-sm">Start applying to jobs to see your applications here</p>
+            <p className="text-gray-600 mb-2 text-lg font-medium">{t('applications.noApplicationsYet')}</p>
+            <p className="text-gray-500 text-sm">{t('applications.startApplying')}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -63,7 +67,7 @@ export function Applications({ applications = [], candidateId, token }) {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-gray-900 text-lg">{app.job_title || 'Unknown Job'}</h3>
+                      <h3 className="font-semibold text-gray-900 text-lg">{app.job_title || t('applications.unknownJob')}</h3>
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold border capitalize ${statusColors[app.status] || statusColors['applied']}`}>
                         {app.status || 'applied'}
                       </span>
@@ -73,7 +77,7 @@ export function Applications({ applications = [], candidateId, token }) {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
-                        {app.company_name || 'Company'}
+                        {app.company_name || t('applications.company')}
                       </span>
                       <span className="flex items-center gap-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,8 +89,8 @@ export function Applications({ applications = [], candidateId, token }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-500 mb-2">Applied</p>
-                    <p className="text-sm font-medium text-gray-700">{new Date(app.applied_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500 mb-2">{t('applications.applied')}</p>
+                    <p className="text-sm font-medium text-gray-700">{t('applications.appliedOn', { date: new Date(app.applied_at).toLocaleDateString() })}</p>
                   </div>
                 </div>
 
@@ -97,7 +101,7 @@ export function Applications({ applications = [], candidateId, token }) {
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      Profile
+                      {t('applications.submissionSummary.profile')}
                     </span>
                   )}
                   {app.used_cv && (
@@ -105,7 +109,7 @@ export function Applications({ applications = [], candidateId, token }) {
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      CV
+                      {t('applications.submissionSummary.cv')}
                     </span>
                   )}
                   {app.custom_files && app.custom_files.length > 0 && (
@@ -113,7 +117,7 @@ export function Applications({ applications = [], candidateId, token }) {
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M4 4a2 2 0 012-2h6a1 1 0 00-.707.293L6.293 6.586A1 1 0 006 7.293V4zm2 4a1 1 0 100-2 1 1 0 000 2zm0 4a1 1 0 100-2 1 1 0 000 2zm0 4a1 1 0 100-2 1 1 0 000 2z" />
                       </svg>
-                      {app.custom_files.length} file(s)
+                      {t('applications.submissionSummary.files', { count: app.custom_files.length })}
                     </span>
                   )}
                   {app.cover_letter && (
@@ -122,16 +126,16 @@ export function Applications({ applications = [], candidateId, token }) {
                         <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                         <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                       </svg>
-                      Cover Letter
+                      {t('applications.submissionSummary.coverLetter')}
                     </span>
                   )}
                 </div>
 
-                <button 
+                <button
                   onClick={() => setSelectedApplication(app)}
                   className="text-primary hover:text-primary-hover font-semibold text-sm flex items-center gap-1"
                 >
-                  View Full Details
+                  {t('applications.viewDetails')}
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -150,7 +154,7 @@ export function Applications({ applications = [], candidateId, token }) {
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{selectedApplication.job_title}</h2>
                 <p className="text-sm text-gray-600 mt-1">{selectedApplication.company_name} · {selectedApplication.job_location}</p>
-                <p className="text-xs text-gray-500 mt-2">Applied on {new Date(selectedApplication.applied_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p className="text-xs text-gray-500 mt-2">{t('applications.modal.appliedOn', { date: new Date(selectedApplication.applied_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) })}</p>
               </div>
               <button
                 onClick={() => setSelectedApplication(null)}
@@ -163,27 +167,26 @@ export function Applications({ applications = [], candidateId, token }) {
             <div className="p-6 space-y-6">
               {/* Status */}
               <div>
-                <p className="text-xs text-gray-500 font-semibold mb-2">APPLICATION STATUS</p>
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border capitalize ${
-                  selectedApplication.status === 'applied' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                  selectedApplication.status === 'reviewing' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                  selectedApplication.status === 'accepted' ? 'bg-green-50 text-green-700 border-green-200' :
-                  'bg-red-50 text-red-700 border-red-200'
-                }`}>
+                <p className="text-xs text-gray-500 font-semibold mb-2">{t('applications.modal.applicationStatus')}</p>
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border capitalize ${selectedApplication.status === 'applied' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                    selectedApplication.status === 'reviewing' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                      selectedApplication.status === 'accepted' ? 'bg-green-50 text-green-700 border-green-200' :
+                        'bg-red-50 text-red-700 border-red-200'
+                  }`}>
                   {selectedApplication.status || 'applied'}
                 </span>
               </div>
 
               {/* What You Submitted */}
               <div>
-                <p className="text-xs text-gray-500 font-semibold mb-3">WHAT YOU SUBMITTED</p>
+                <p className="text-xs text-gray-500 font-semibold mb-3">{t('applications.modal.whatYouSubmitted')}</p>
                 <div className="space-y-2">
                   {selectedApplication.used_profile && (
                     <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-100">
                       <svg className="w-5 h-5 text-green-700" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-sm font-medium text-green-900">Saved Profile</span>
+                      <span className="text-sm font-medium text-green-900">{t('applications.modal.savedProfile')}</span>
                     </div>
                   )}
                   {selectedApplication.used_cv && (
@@ -191,12 +194,12 @@ export function Applications({ applications = [], candidateId, token }) {
                       <svg className="w-5 h-5 text-blue-700" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-sm font-medium text-blue-900">CV Attachment</span>
+                      <span className="text-sm font-medium text-blue-900">{t('applications.modal.cvAttachment')}</span>
                     </div>
                   )}
                   {selectedApplication.custom_files && selectedApplication.custom_files.length > 0 && (
                     <div>
-                      <p className="text-sm font-medium text-gray-900 mb-2">Custom Documents ({selectedApplication.custom_files.length})</p>
+                      <p className="text-sm font-medium text-gray-900 mb-2">{t('applications.modal.customDocuments', { count: selectedApplication.custom_files.length })}</p>
                       <div className="space-y-2">
                         {selectedApplication.custom_files.map((file, idx) => (
                           <a
@@ -227,9 +230,9 @@ export function Applications({ applications = [], candidateId, token }) {
               {/* Cover Letter */}
               {selectedApplication.cover_letter && (
                 <div>
-                  <p className="text-xs text-gray-500 font-semibold mb-3">COVER LETTER</p>
+                  <p className="text-xs text-gray-500 font-semibold mb-3">{t('applications.modal.coverLetter')}</p>
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700 whitespace-pre-wrap">
-                    {selectedApplication.cover_letter}
+                    {selectedApplication.cover_letter || t('applications.modal.noCoverLetter')}
                   </div>
                 </div>
               )}

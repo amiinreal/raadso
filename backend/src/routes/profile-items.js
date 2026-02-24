@@ -7,6 +7,7 @@ import {
   isValidDate,
   isValidYear,
   isValidUrl,
+  isValidUUID,
   isValidPositiveInteger,
   EMPLOYMENT_TYPES,
   PROFICIENCY_LEVELS
@@ -16,7 +17,7 @@ const router = Router()
 
 // Validation schemas
 const workExperienceValidation = validateRequest({
-  candidateId: { required: true, validator: isValidPositiveInteger },
+  candidateId: { required: true, validator: isValidUUID },
   jobTitle: { required: true, type: 'string', min: 2, max: 200 },
   companyName: { required: true, type: 'string', min: 2, max: 200 },
   employmentType: { type: 'enum', values: EMPLOYMENT_TYPES },
@@ -26,7 +27,7 @@ const workExperienceValidation = validateRequest({
 })
 
 const educationValidation = validateRequest({
-  candidateId: { required: true, validator: isValidPositiveInteger },
+  candidateId: { required: true, validator: isValidUUID },
   degree: { required: true, type: 'string', min: 2, max: 200 },
   fieldOfStudy: { required: true, type: 'string', min: 2, max: 200 },
   institution: { required: true, type: 'string', min: 2, max: 200 },
@@ -35,19 +36,19 @@ const educationValidation = validateRequest({
 })
 
 const skillValidation = validateRequest({
-  candidateId: { required: true, validator: isValidPositiveInteger },
+  candidateId: { required: true, validator: isValidUUID },
   skillName: { required: true, type: 'string', min: 1, max: 100 },
   proficiency: { type: 'enum', values: PROFICIENCY_LEVELS }
 })
 
 const languageValidation = validateRequest({
-  candidateId: { required: true, validator: isValidPositiveInteger },
+  candidateId: { required: true, validator: isValidUUID },
   languageName: { required: true, type: 'string', min: 2, max: 100 },
   proficiency: { required: true, type: 'enum', values: PROFICIENCY_LEVELS }
 })
 
 const attachmentValidation = validateRequest({
-  candidateId: { required: true, validator: isValidPositiveInteger },
+  candidateId: { required: true, validator: isValidUUID },
   fileName: { required: true, type: 'string', min: 1, max: 255 },
   fileType: { required: true, type: 'string', min: 1, max: 100 },
   fileUrl: { required: true, type: 'url' },

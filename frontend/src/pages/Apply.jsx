@@ -1,11 +1,14 @@
 import { useMemo, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { isValidLength, sanitizeInput, validateDocumentFile } from '../utils/validation.js'
 import { api } from '../api/api.js'
 import { JobDetailContent } from '../components/JobDetailContent'
+import { useTranslation } from '../i18n/TranslationProvider'
 
 export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, submitting, isEmployerPreview = false }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  const { jobId } = useParams()
   const [useProfile, setUseProfile] = useState(true)
   const [useCv, setUseCv] = useState(true)
   const [coverLetter, setCoverLetter] = useState('')
@@ -29,7 +32,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
   }, [jobs, search])
 
   if (!job) return null
-  
+
   // Employer preview mode - show layout but disable application
   if (isEmployerPreview) {
     return (
@@ -42,12 +45,12 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                 <img src={job.logo_url} alt={job.company_name} className="h-12 w-12 rounded-lg object-cover border mb-4" />
               ) : (
                 <div className="h-12 w-12 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-lg font-semibold mb-4">
-                  {(job.company_name || 'JP').substring(0,2).toUpperCase()}
+                  {(job.company_name || 'JP').substring(0, 2).toUpperCase()}
                 </div>
               )}
               <h3 className="text-lg font-bold text-slate-900 mb-1">{job.title}</h3>
               <p className="text-sm text-slate-600 mb-4">{job.company_name || 'Company'}</p>
-              
+
               <div className="space-y-2 text-sm mb-4">
                 <p className="text-slate-700"><span className="font-semibold">📍</span> {job.location}</p>
                 <p className="text-slate-700"><span className="font-semibold">💼</span> {job.employment_type}</p>
@@ -58,7 +61,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
               {(job.salary_min || job.salary_max) && (
                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg mb-4">
                   <p className="text-xs font-semibold text-green-900">
-                    {job.salary_min ? `${job.salary_min.toLocaleString()}` : ''}{job.salary_max ? ` - ${job.salary_max.toLocaleString()}` : ''} {job.currency || 'USD'}
+                    {job.salary_min ? `${job.salary_min.toLocaleString()} ` : ''}{job.salary_max ? `- ${job.salary_max.toLocaleString()}` : ''} {job.currency || 'USD'}
                   </p>
                 </div>
               )}
@@ -98,18 +101,15 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-blue-900 mb-2">👁️ Employer Preview Mode</h3>
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">{t('apply.employerPreview')}</h3>
                   <p className="text-sm text-blue-800 mb-2">
-                    This is exactly how your job application page looks to candidates. The layout, form fields, and requirements shown below are what applicants will see.
-                  </p>
-                  <p className="text-sm text-blue-700 font-medium mb-3">
-                    ⚠️ You cannot apply to your own job posting.
+                    {t('apply.previewDescription')}
                   </p>
                   <button
                     onClick={() => navigate('/employer-dashboard')}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
                   >
-                    ← Back to Dashboard
+                    {t('apply.backToDashboard')}
                   </button>
                 </div>
               </div>
@@ -119,8 +119,8 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
             <div className="grid-card">
               <div className="mb-6">
                 <span className="pill inline-block mb-3">Application Preview</span>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Apply for {job.title}</h2>
-                <p className="text-sm text-slate-600">Below is what candidates will see when applying for this position</p>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">{t('apply.header', { jobTitle: job.title })}</h2>
+                <p className="text-sm text-slate-600 mb-4">{t('apply.previewBadge')}</p>
               </div>
 
               {/* Application Requirements Section */}
@@ -135,37 +135,37 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                   {job.require_profile && (
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">✓</span>
-                      <span>Candidate profile will be shared with employer</span>
+                      <p className="text-sm text-slate-700">{t('apply.requirements.profile')}</p>
                     </li>
                   )}
                   {job.require_profile && job.require_experience && (
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">✓</span>
-                      <span>At least one work experience entry required</span>
+                      <p className="text-sm text-slate-700">{t('apply.requirements.experience')}</p>
                     </li>
                   )}
                   {job.require_profile && job.require_education && (
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">✓</span>
-                      <span>At least one education entry required</span>
+                      <p className="text-sm text-slate-700">{t('apply.requirements.education')}</p>
                     </li>
                   )}
                   {job.require_profile && job.require_nationality && (
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">✓</span>
-                      <span>Nationality information required</span>
+                      <p className="text-sm text-slate-700">{t('apply.requirements.nationality')}</p>
                     </li>
                   )}
                   {job.require_profile && Array.isArray(job.require_languages) && job.require_languages.length > 0 && (
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">✓</span>
-                      <span>Languages required: {job.require_languages.join(', ')}</span>
+                      <p className="text-sm text-slate-700">{t('apply.requirements.languages', { languages: job.require_languages.join(', ') })}</p>
                     </li>
                   )}
                   {job.require_cv && (
                     <li className="flex items-start gap-2">
                       <span className="text-green-600 mt-0.5">✓</span>
-                      <span>CV attachment required</span>
+                      <p className="text-sm text-slate-700">{t('apply.requirements.cv')}</p>
                     </li>
                   )}
                   {Array.isArray(job.custom_file_requirements) && job.custom_file_requirements.length > 0 && (
@@ -184,7 +184,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                   {!job.require_profile && !job.require_cv && (!job.custom_file_requirements || job.custom_file_requirements.length === 0) && (
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 mt-0.5">○</span>
-                      <span>No additional application requirements</span>
+                      <p className="text-sm text-slate-700">{t('apply.requirements.noAdditional')}</p>
                     </li>
                   )}
                 </ul>
@@ -201,21 +201,21 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                     <p className="text-xs text-slate-500 ml-6">Your profile information will be shared with the employer</p>
                   </div>
                 )}
-                
+
                 {job.require_cv && (
                   <div>
                     <label className="block text-sm font-medium text-slate-900 mb-1">
                       <input type="checkbox" checked readOnly className="mr-2" />
-                      Attach my CV
+                      {t('apply.labels.attachCv')}
                     </label>
-                    <p className="text-xs text-slate-500 ml-6">Your CV file will be included with the application</p>
+                    <p className="text-xs text-slate-500 ml-6">{t('apply.hints.attachCv')}</p>
                   </div>
                 )}
 
                 {/* Custom file requirements */}
                 {Array.isArray(job.custom_file_requirements) && job.custom_file_requirements.length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-slate-900">Additional Documents</h4>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">{t('apply.labels.additionalDocs')}</h3>
                     {job.custom_file_requirements.map(req => (
                       <div key={req.id} className="border border-gray-200 rounded-lg p-3">
                         <label className="block text-sm font-medium text-slate-900 mb-1">
@@ -242,13 +242,11 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-900 mb-1">
-                    Cover Letter {job.require_cover_letter && <span className="text-red-500">*</span>}
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t('apply.labels.coverLetter')}</label>
                   <textarea
                     rows="4"
                     className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                    placeholder="Tell us why you're a great fit for this role..."
+                    placeholder={t('apply.placeholders.coverLetter')}
                     disabled
                   />
                   <p className="text-xs text-slate-500 mt-1">
@@ -257,7 +255,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                 </div>
 
                 <button className="w-full bg-gray-300 text-gray-600 py-3 rounded-lg font-semibold cursor-not-allowed">
-                  Submit Application (Preview Only)
+                  {t('apply.actions.submitPreview')}
                 </button>
               </div>
             </div>
@@ -266,7 +264,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
       </div>
     )
   }
-  
+
   if (job && !candidateProfile) {
     return (
       <div className="flex-1 flex items-start justify-center p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scrollbar">
@@ -278,7 +276,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
                 <img src={job.logo_url} alt={job.company_name} className="h-12 w-12 rounded-lg object-cover border mb-4" />
               ) : (
                 <div className="h-12 w-12 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-lg font-semibold mb-4">
-                  {(job.company_name || 'JP').substring(0,2).toUpperCase()}
+                  {(job.company_name || 'JP').substring(0, 2).toUpperCase()}
                 </div>
               )}
               <h1 className="text-xl font-bold text-slate-900">{job.title}</h1>
@@ -306,59 +304,60 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
           <div className="lg:col-span-2">
             <div className="grid-card">
               <p className="pill inline-block mb-3">Apply</p>
-              <h2 className="text-xl font-semibold text-slate-900 mb-2">Sign in to apply</h2>
-              <p className="text-sm text-slate-600 mb-4">Create an account or sign in to apply for this job. You'll need to meet the employer's requirements listed below.</p>
-
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">{t('apply.auth.signinHeader')}</h2>
+              <p className="text-slate-600 mb-6 font-medium">
+                {t('apply.auth.signinHint')}
+              </p>
               <div className="mb-4">
-                <h3 className="font-semibold text-slate-900 mb-2">Employer requirements</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">{t('apply.requirementsHeader')}</h3>
                 <ul className="list-disc ml-5 space-y-1 text-sm text-slate-700">
                   {job.require_profile && (
-                    <li>Your candidate profile will be shared with the employer</li>
+                    <li>{t('apply.requirements.profile')}</li>
                   )}
                   {job.require_profile && job.require_experience && (
-                    <li>At least one work experience entry is required</li>
+                    <li>{t('apply.requirements.experience')}</li>
                   )}
                   {job.require_profile && job.require_education && (
-                    <li>At least one education entry is required</li>
+                    <li>{t('apply.requirements.education')}</li>
                   )}
                   {job.require_profile && Array.isArray(job.require_languages) && job.require_languages.length > 0 && (
-                    <li>Languages required: {job.require_languages.join(', ')}</li>
+                    <li>{t('apply.requirements.languages', { languages: job.require_languages.join(', ') })}</li>
                   )}
                   {job.require_profile && job.require_nationality && (
-                    <li>Nationality information is required</li>
+                    <li>{t('apply.requirements.nationality')}</li>
                   )}
                   {job.require_cv && (
-                    <li>CV attachment is required</li>
+                    <li>{t('apply.requirements.cv')}</li>
                   )}
                   {Array.isArray(job.custom_file_requirements) && job.custom_file_requirements.length > 0 && (
-                    <li>Additional documents:
+                    <li>{t('apply.requirements.additionalDocs')}:
                       <ul className="list-disc ml-5 mt-1 space-y-1">
                         {job.custom_file_requirements.map(req => (
                           <li key={req.id} className="text-slate-700">
-                            {req.name} {req.required ? '(required)' : '(optional)'}{req.fileTypes?.length ? ` • types: ${req.fileTypes.join(', ')}` : ''}
+                            {req.name} {req.required ? `(${t('apply.common.required')})` : `(${t('apply.common.optional')})`}{req.fileTypes?.length ? ` • ${t('apply.common.types')}: ${req.fileTypes.join(', ')}` : ''}
                           </li>
                         ))}
                       </ul>
                     </li>
                   )}
                   {!job.require_profile && !job.require_cv && (!job.custom_file_requirements || job.custom_file_requirements.length === 0) && (
-                    <li>No additional application requirements</li>
+                    <li>{t('apply.requirements.noAdditional')}</li>
                   )}
                 </ul>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <button
-                  onClick={() => navigate('/login')}
-                  className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-90"
+                  onClick={() => navigate('/auth?mode=signin')}
+                  className="flex-1 bg-primary text-white py-3 rounded-lg font-semibold hover:opacity-90 transition shadow-md"
                 >
-                  Sign in to apply
+                  {t('apply.auth.signinBtn')}
                 </button>
                 <button
-                  onClick={() => navigate('/register')}
-                  className="px-4 py-2 border border-slate-200 rounded-lg font-semibold hover:bg-slate-50"
+                  onClick={() => navigate('/auth?mode=register')}
+                  className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-200 transition"
                 >
-                  Create account
+                  {t('apply.auth.registerBtn')}
                 </button>
               </div>
             </div>
@@ -374,25 +373,25 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
 
     if (job.require_profile) {
       if (job.require_experience && (!candidateProfile?.workExperiences || candidateProfile.workExperiences.length === 0)) {
-        unmetRequirements.push('at least one work experience')
+        unmetRequirements.push(t('apply.requirements.experience'))
       }
       if (job.require_education && (!candidateProfile?.educations || candidateProfile.educations.length === 0)) {
-        unmetRequirements.push('at least one education entry')
+        unmetRequirements.push(t('apply.requirements.education'))
       }
       // Check if candidate has ALL required languages
       if (job.require_languages && job.require_languages.length > 0) {
         const candidateLanguages = (candidateProfile?.languages || []).map(l => l.language || l)
-        const missingLanguages = job.require_languages.filter(required => 
-          !candidateLanguages.some(candidate => 
+        const missingLanguages = job.require_languages.filter(required =>
+          !candidateLanguages.some(candidate =>
             candidate.toLowerCase() === required.toLowerCase()
           )
         )
         if (missingLanguages.length > 0) {
-          unmetRequirements.push(`languages (missing: ${missingLanguages.join(', ')})`)
+          unmetRequirements.push(t('apply.requirements.languagesMissing', { languages: missingLanguages.join(', ') }))
         }
       }
       if (job.require_nationality && !candidateProfile?.profile?.nationality) {
-        unmetRequirements.push('nationality information')
+        unmetRequirements.push(t('apply.requirements.nationality'))
       }
     }
 
@@ -424,13 +423,13 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
   // Upload files to Bunny CDN when form is submitted
   const uploadFilesToBunny = async (filesToUpload) => {
     const uploadedFiles = {}
-    
+
     for (const [requirementId, file] of Object.entries(filesToUpload)) {
       if (!file) continue
-      
+
       try {
         setUploading(prev => ({ ...prev, [requirementId]: true }))
-        
+
         const formDataObj = new FormData()
         formDataObj.append('file', file)
 
@@ -453,69 +452,69 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
         }
       } catch (err) {
         console.error('Upload failed:', err)
-        setValidationErrors(prev => ({ ...prev, [requirementId]: 'Failed to upload file' }))
+        setValidationErrors(prev => ({ ...prev, [requirementId]: t('apply.errors.uploadFailed') }))
         throw err
       } finally {
         setUploading(prev => ({ ...prev, [requirementId]: false }))
       }
     }
-    
+
     return uploadedFiles
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     // Validate cover letter length
     if (coverLetter && coverLetter.length > 5000) {
-      setValidationErrors({ coverLetter: 'Cover letter must be under 5000 characters' })
+      setValidationErrors({ coverLetter: t('apply.errors.coverLetterLength') })
       return
     }
 
     // Check required fields
     const errors = {}
-    
+
     // Profile requirement checks
     if (job.require_profile && !useProfile) {
-      errors.profile = 'Profile is required for this job'
+      errors.profile = t('apply.errors.profileRequired')
     }
     if (job.require_profile && useProfile) {
       // Check experience requirement
       if (job.require_experience && (!candidateProfile?.workExperiences || candidateProfile.workExperiences.length === 0)) {
-        errors.experience = 'You must add at least one work experience to apply to this job'
+        errors.experience = t('apply.errors.experienceRequired')
       }
       // Check education requirement
       if (job.require_education && (!candidateProfile?.educations || candidateProfile.educations.length === 0)) {
-        errors.education = 'You must add at least one education entry to apply to this job'
+        errors.education = t('apply.errors.educationRequired')
       }
       // Check languages requirement - must have ALL required languages
       if (job.require_languages && job.require_languages.length > 0) {
         const candidateLanguages = (candidateProfile?.languages || []).map(l => l.language || l)
-        const missingLanguages = job.require_languages.filter(required => 
-          !candidateLanguages.some(candidate => 
+        const missingLanguages = job.require_languages.filter(required =>
+          !candidateLanguages.some(candidate =>
             candidate.toLowerCase() === required.toLowerCase()
           )
         )
         if (missingLanguages.length > 0) {
-          errors.languages = `You must add the following languages to apply: ${missingLanguages.join(', ')}`
+          errors.languages = t('apply.errors.languagesMissing', { languages: missingLanguages.join(', ') })
         }
       }
       // Check nationality requirement
       if (job.require_nationality && !candidateProfile?.profile?.nationality) {
-        errors.nationality = 'You must specify your nationality to apply to this job'
+        errors.nationality = t('apply.errors.nationalityRequired')
       }
     }
-    
+
     // CV requirement check
     if (job.require_cv && !job.require_profile && !useCv) {
-      errors.cv = 'CV is required for this job'
+      errors.cv = t('apply.errors.cvRequired')
     }
-    
+
     // Custom file requirements
     if (job.custom_file_requirements) {
       for (const req of job.custom_file_requirements) {
         if (req.required && !customFiles[req.id]) {
-          errors[req.id] = `${req.name} is required`
+          errors[req.id] = t('apply.errors.customFileRequired', { fileName: req.name })
         }
       }
     }
@@ -541,7 +540,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
       // Submit application with file URLs
       onSubmit?.({
         jobId: job.id,
-        candidateId: candidateProfile.id,
+        candidateId: candidateProfile.profile.id,
         usedProfile: useProfile,
         usedCv: useCv,
         coverLetter: sanitizeInput(coverLetter),
@@ -549,7 +548,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
       })
     } catch (err) {
       console.error('Failed to submit application:', err)
-      setValidationErrors({ submit: 'Failed to upload files. Please try again.' })
+      setValidationErrors({ submit: t('apply.errors.submitFailed') })
     }
   }
 
@@ -565,12 +564,12 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
               <img src={job.logo_url} alt={job.company_name} className="h-12 w-12 rounded-lg object-cover border mb-4" />
             ) : (
               <div className="h-12 w-12 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-lg font-semibold mb-4">
-                {(job.company_name || 'JP').substring(0,2).toUpperCase()}
+                {(job.company_name || 'JP').substring(0, 2).toUpperCase()}
               </div>
             )}
             <h3 className="text-lg font-bold text-slate-900 mb-1">{job.title}</h3>
             <p className="text-sm text-slate-600 mb-4">{job.company_name || 'Company'}</p>
-            
+
             <div className="space-y-2 text-sm mb-4">
               <p className="text-slate-700"><span className="font-semibold">📍</span> {job.location}</p>
               <p className="text-slate-700"><span className="font-semibold">💼</span> {job.employment_type}</p>
@@ -581,7 +580,7 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
             {(job.salary_min || job.salary_max) && (
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg mb-4">
                 <p className="text-xs font-semibold text-green-900">
-                  {job.salary_min ? `${job.salary_min.toLocaleString()}` : ''}{job.salary_max ? ` - ${job.salary_max.toLocaleString()}` : ''} {job.currency || 'USD'}
+                  {job.salary_min ? `${job.salary_min.toLocaleString()} ` : ''}{job.salary_max ? `- ${job.salary_max.toLocaleString()}` : ''} {job.currency || 'USD'}
                 </p>
               </div>
             )}
@@ -639,185 +638,186 @@ export function Apply({ job, jobs = [], onPickJob, candidateProfile, onSubmit, s
         {/* Application Form - Full width on mobile, col-span-2 on desktop */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="grid-card">
-          <p className="pill inline-block mb-3">Apply</p>
-      
-      {/* Warning if requirements not met */}
-      {!canApply && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0-10a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h3 className="font-semibold text-red-900">Cannot apply - Missing requirements</h3>
-              <p className="text-sm text-red-800 mt-1">To apply for this job, you must complete your profile with:</p>
-              <ul className="text-sm text-red-800 mt-2 ml-4 space-y-1">
-                {unmetRequirements.map((req, idx) => (
-                  <li key={idx} className="list-disc">{req}</li>
-                ))}
-              </ul>
-              <p className="text-sm text-red-700 mt-3 font-medium">Please update your profile and try again.</p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-slate-900">{job.title}</h2>
-          <p className="text-sm text-slate-500 mb-2">{job.company_name || 'Company'} · {job.location} · {job.employment_type}</p>
-        </div>
-        {/* Removed secondary job search box per UX: applying to a chosen job shouldn't prompt another search */}
-      </div>
+            <p className="pill inline-block mb-3">Apply</p>
 
-      <div className="grid gap-3">
-        {job.require_profile && (
-          <label className={`flex items-start gap-3 text-sm ${validationErrors.profile ? 'text-red-600' : 'text-slate-700'}`}>
-            <input 
-              type="checkbox" 
-              checked={useProfile} 
-              onChange={(e) => {
-                setUseProfile(e.target.checked)
-                if (validationErrors.profile && e.target.checked) {
-                  setValidationErrors(prev => ({ ...prev, profile: undefined }))
-                }
-              }}
-              className="mt-1" 
-            />
-            <span>
-              <span className="font-semibold">Use my saved profile *</span>
-              <br />
-              <span className={validationErrors.profile ? 'text-red-600' : 'text-slate-500'}>
-                {validationErrors.profile ? validationErrors.profile : 'Share experience, education, and skills from your candidate profile.'}
-              </span>
-            </span>
-          </label>
-        )}
-
-        {!job.require_profile && (
-          <label className="flex items-start gap-3 text-sm text-slate-700">
-            <input type="checkbox" checked={useProfile} onChange={(e) => setUseProfile(e.target.checked)} className="mt-1" />
-            <span>
-              <span className="font-semibold">Use my saved profile</span>
-              <br />
-              <span className="text-slate-500">Share experience, education, and skills from your candidate profile.</span>
-            </span>
-          </label>
-        )}
-
-        {/* CV Attachment - Only show if employer has enabled it */}
-        {job.require_cv && (
-          <label className={`flex items-start gap-3 text-sm ${validationErrors.cv ? 'text-red-600' : 'text-slate-700'}`}>
-            <input 
-              type="checkbox" 
-              checked={useCv}
-              onChange={(e) => {
-                setUseCv(e.target.checked)
-                if (validationErrors.cv && e.target.checked) {
-                  setValidationErrors(prev => ({ ...prev, cv: undefined }))
-                }
-              }}
-              className="mt-1" 
-            />
-            <span>
-              <span className="font-semibold">Attach CV {job.require_profile ? '' : '*'}</span>
-              <br />
-              <span className={validationErrors.cv ? 'text-red-600' : 'text-slate-500'}>
-                {validationErrors.cv ? validationErrors.cv : 'Flag that a CV is attached or will be provided.'}
-              </span>
-            </span>
-          </label>
-        )}
-
-        <label className="text-sm text-slate-700">
-          <span className="font-semibold">Cover letter (optional)</span>
-          <textarea
-            value={coverLetter}
-            onChange={(e) => {
-              setCoverLetter(e.target.value)
-              if (validationErrors.coverLetter) {
-                setValidationErrors(prev => ({ ...prev, coverLetter: undefined }))
-              }
-            }}
-            placeholder="Keep it concise. Focus on impact and alignment."
-            className={`mt-2 w-full border ${validationErrors.coverLetter ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
-            rows={4}
-            maxLength={5000}
-          />
-          {validationErrors.coverLetter && (
-            <p className="mt-1 text-sm text-red-600">{validationErrors.coverLetter}</p>
-          )}
-        </label>
-
-        {job.custom_file_requirements && job.custom_file_requirements.length > 0 && (
-          <div className="border-t border-slate-200 pt-4 mt-4">
-            <h4 className="font-semibold text-slate-900 mb-4 text-sm">Required Documents</h4>
-            {job.custom_file_requirements.map(req => (
-              <div key={req.id} className="mb-4">
-                <label className={`text-sm ${validationErrors[req.id] ? 'text-red-600' : 'text-slate-700'}`}>
-                  <span className="font-semibold">{req.name} {req.required ? '*' : '(optional)'}</span>
-                  {req.description && (
-                    <div className="text-xs text-slate-500 mt-1">{req.description}</div>
-                  )}
-                  <div className="mt-2 relative">
-                    <input
-                      type="file"
-                      onChange={(e) => handleFileSelect(req.id, e.target.files?.[0])}
-                      disabled={uploading[req.id]}
-                      className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:opacity-90"
-                      accept={req.fileTypes?.map(t => `.${t}`).join(',')}
-                    />
-                    {uploading[req.id] && <p className="mt-2 text-xs text-slate-500">Uploading...</p>}
-                    {customFiles[req.id] && !uploading[req.id] && (
-                      <p className="mt-2 text-xs text-green-600">✓ {customFiles[req.id].name}</p>
-                    )}
-                    {validationErrors[req.id] && (
-                      <p className="mt-2 text-xs text-red-600">{validationErrors[req.id]}</p>
-                    )}
+            {/* Warning if requirements not met */}
+            {!canApply && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0-10a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <h3 className="text-lg font-bold text-red-900 mb-2">{t('apply.errors.missingReqs')}</h3>
+                    <p className="text-sm text-red-800 mb-4">
+                      {t('apply.errors.unmetListPrefix')}
+                    </p>
+                    <ul className="text-sm text-red-800 mt-2 ml-4 space-y-1">
+                      {unmetRequirements.map((req, idx) => (
+                        <li key={idx} className="list-disc">{req}</li>
+                      ))}
+                    </ul>
+                    <p className="text-sm text-red-700 mt-3 font-medium">{t('apply.errors.updateProfileHint')}</p>
                   </div>
-                </label>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            )}
 
-      {/* Validation Error Messages */}
-      {Object.keys(validationErrors).length > 0 && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <h4 className="font-semibold text-red-900 mb-2">Please fix the following before applying:</h4>
-          <ul className="space-y-1 text-sm text-red-800">
-            {validationErrors.profile && <li>• {validationErrors.profile}</li>}
-            {validationErrors.experience && <li>• {validationErrors.experience}</li>}
-            {validationErrors.education && <li>• {validationErrors.education}</li>}
-            {validationErrors.languages && <li>• {validationErrors.languages}</li>}
-            {validationErrors.nationality && <li>• {validationErrors.nationality}</li>}
-            {validationErrors.cv && <li>• {validationErrors.cv}</li>}
-            {validationErrors.coverLetter && <li>• {validationErrors.coverLetter}</li>}
-            {validationErrors.submit && <li>• {validationErrors.submit}</li>}
-            {Object.entries(validationErrors).map(([key, error]) => {
-              if (!['profile', 'experience', 'education', 'languages', 'nationality', 'cv', 'coverLetter', 'submit'].includes(key) && error) {
-                return <li key={key}>• {error}</li>
-              }
-              return null
-            })}
-          </ul>
-        </div>
-      )}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">{job.title}</h2>
+                <p className="text-sm text-slate-500 mb-2">{job.company_name || 'Company'} · {job.location} · {job.employment_type}</p>
+              </div>
+              {/* Removed secondary job search box per UX: applying to a chosen job shouldn't prompt another search */}
+            </div>
 
-      <button
-        type="submit"
-        disabled={submitting || !canApply}
-        title={!canApply ? 'Complete missing profile requirements to apply' : ''}
-        className={`mt-4 px-4 py-3 w-full rounded-lg font-semibold shadow-soft transition-all ${
-          !canApply 
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-            : 'bg-primary text-white hover:opacity-90 disabled:opacity-50'
-        }`}
-      >
-        {submitting ? 'Submitting...' : canApply ? 'Submit application' : 'Complete profile to apply'}
-      </button>
-      </form>
+            <div className="grid gap-3">
+              {job.require_profile && (
+                <label className={`flex items-start gap-3 text-sm ${validationErrors.profile ? 'text-red-600' : 'text-slate-700'}`}>
+                  <input
+                    type="checkbox"
+                    checked={useProfile}
+                    onChange={(e) => {
+                      setUseProfile(e.target.checked)
+                      if (validationErrors.profile && e.target.checked) {
+                        setValidationErrors(prev => ({ ...prev, profile: undefined }))
+                      }
+                    }}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="font-semibold">{t('apply.labels.useProfile')} *</span>
+                    <br />
+                    <span className={validationErrors.profile ? 'text-red-600' : 'text-slate-500'}>
+                      {validationErrors.profile ? validationErrors.profile : t('apply.hints.useProfile')}
+                    </span>
+                  </span>
+                </label>
+              )}
+
+              {!job.require_profile && (
+                <label className="flex items-start gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={useProfile} onChange={(e) => setUseProfile(e.target.checked)} className="mt-1" />
+                  <span>
+                    <span className="font-semibold">{t('apply.labels.useProfile')}</span>
+                    <br />
+                    <span className="text-slate-500">{t('apply.hints.useProfile')}</span>
+                  </span>
+                </label>
+              )}
+
+              {/* CV Attachment - Only show if employer has enabled it */}
+              {job.require_cv && (
+                <label className={`flex items-start gap-3 text-sm ${validationErrors.cv ? 'text-red-600' : 'text-slate-700'}`}>
+                  <input
+                    type="checkbox"
+                    checked={useCv}
+                    onChange={(e) => {
+                      setUseCv(e.target.checked)
+                      if (validationErrors.cv && e.target.checked) {
+                        setValidationErrors(prev => ({ ...prev, cv: undefined }))
+                      }
+                    }}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="font-semibold">{t('apply.labels.attachCv')} {job.require_profile ? '' : '*'}</span>
+                    <br />
+                    <span className={validationErrors.cv ? 'text-red-600' : 'text-slate-500'}>
+                      {validationErrors.cv ? validationErrors.cv : t('apply.hints.attachCv')}
+                    </span>
+                  </span>
+                </label>
+              )}
+
+              <label className="text-sm text-slate-700">
+                <span className="font-semibold">{t('apply.labels.coverLetter')} {job.require_cover_letter && <span className="text-red-500">*</span>}</span>
+                <textarea
+                  value={coverLetter}
+                  onChange={(e) => {
+                    setCoverLetter(e.target.value)
+                    if (validationErrors.coverLetter) {
+                      setValidationErrors(prev => ({ ...prev, coverLetter: undefined }))
+                    }
+                  }}
+                  placeholder={t('apply.placeholders.coverLetter')}
+                  className={`mt-2 w-full border ${validationErrors.coverLetter ? 'border-red-500' : 'border-slate-200'} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary`}
+                  rows={4}
+                  maxLength={5000}
+                />
+                {validationErrors.coverLetter && (
+                  <p className="mt-1 text-sm text-red-600">{validationErrors.coverLetter}</p>
+                )}
+              </label>
+
+              {job.custom_file_requirements && job.custom_file_requirements.length > 0 && (
+                <div className="border-t border-slate-200 pt-4 mt-4">
+                  <h4 className="font-semibold text-slate-900 mb-4 text-sm">{t('apply.labels.additionalDocs')}</h4>
+                  {job.custom_file_requirements.map(req => (
+                    <div key={req.id} className="mb-4">
+                      <label className={`text-sm ${validationErrors[req.id] ? 'text-red-600' : 'text-slate-700'}`}>
+                        <span className="font-semibold">{req.name} {req.required ? '*' : `(${t('apply.common.optional')})`}</span>
+                        {req.description && (
+                          <div className="text-xs text-slate-500 mt-1">{req.description}</div>
+                        )}
+                        <div className="mt-2 relative">
+                          <input
+                            type="file"
+                            onChange={(e) => handleFileSelect(req.id, e.target.files?.[0])}
+                            disabled={uploading[req.id]}
+                            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:opacity-90"
+                            accept={req.fileTypes?.map(t => `.${t}`).join(',')}
+                          />
+                          {uploading[req.id] && <p className="mt-2 text-xs text-slate-500">{t('common.uploading')}</p>}
+                          {customFiles[req.id] && !uploading[req.id] && (
+                            <p className="mt-2 text-xs text-green-600">✓ {customFiles[req.id].name}</p>
+                          )}
+                          {validationErrors[req.id] && (
+                            <p className="mt-2 text-xs text-red-600">{validationErrors[req.id]}</p>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Validation Error Messages */}
+            {Object.keys(validationErrors).length > 0 && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <h4 className="font-semibold text-red-900 mb-2">{t('apply.errors.fixBeforeApplying')}</h4>
+                <ul className="space-y-1 text-sm text-red-800">
+                  {validationErrors.profile && <li>• {validationErrors.profile}</li>}
+                  {validationErrors.experience && <li>• {validationErrors.experience}</li>}
+                  {validationErrors.education && <li>• {validationErrors.education}</li>}
+                  {validationErrors.languages && <li>• {validationErrors.languages}</li>}
+                  {validationErrors.nationality && <li>• {validationErrors.nationality}</li>}
+                  {validationErrors.cv && <li>• {validationErrors.cv}</li>}
+                  {validationErrors.coverLetter && <li>• {validationErrors.coverLetter}</li>}
+                  {validationErrors.submit && <li>• {validationErrors.submit}</li>}
+                  {Object.entries(validationErrors).map(([key, error]) => {
+                    if (!['profile', 'experience', 'education', 'languages', 'nationality', 'cv', 'coverLetter', 'submit'].includes(key) && error) {
+                      return <li key={key}>• {error}</li>
+                    }
+                    return null
+                  })}
+                </ul>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting || !canApply}
+              title={!canApply ? t('apply.actions.completeProfileToApply') : ''}
+              className={`mt - 4 px - 4 py - 3 w - full rounded - lg font - semibold shadow - soft transition - all ${!canApply
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-primary text-white hover:opacity-90 disabled:opacity-50'
+                } `}
+            >
+              {submitting ? t('common.saving') : canApply ? t('apply.actions.submit') : t('apply.actions.completeProfileToApply')}
+            </button>
+          </form>
         </div>
       </div>
     </div>

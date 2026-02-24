@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/api'
 import { rankIndustriesByQuery } from '../utils/industrySearch'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 import { 
   isValidLength, 
   isValidEmail, 
@@ -359,7 +360,7 @@ export function CompanyEdit() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+        <LoadingSpinner />
       </div>
     )
   }

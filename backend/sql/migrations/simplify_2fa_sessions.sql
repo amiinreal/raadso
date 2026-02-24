@@ -5,7 +5,6 @@
 ALTER TABLE two_fa_sessions 
   DROP COLUMN IF EXISTS encrypted_data,
   DROP COLUMN IF EXISTS device,
-  DROP COLUMN IF EXISTS ip_address,
   DROP COLUMN IF EXISTS last_activity,
   DROP COLUMN IF EXISTS completed_at;
 
